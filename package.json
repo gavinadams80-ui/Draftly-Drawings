@@ -40,23 +40,4 @@
     "svg2pdf.js": "^2.7.0",
     "typescript": "~5.9.3"
   }
-}    },
-    "svg2pdf.js": {
-      "optional": true
-    }
-  },
-  "devDependencies": {
-    "jspdf": "^4.2.1",
-    "svg2pdf.js": "^2.7.0",
-    "typescript": "~5.9.3"
-  }
-}    "svg2pdf.js": {
-      "optional": true
-    }
-  },
-  "devDependencies": {
-    "jspdf": "^4.2.1",
-    "svg2pdf.js": "^2.7.0",
-    "typescript": "~5.9.3"
-  }
 }
