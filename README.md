@@ -39,6 +39,14 @@ npm run build      # emits dist/ (JS + .d.ts)
 npm run typecheck  # type-only check, no emit
 ```
 
+## Versioning & releases
+
+Consumers pin an **immutable git tag** (e.g.
+`github:gavinadams80-ui/Draftly-Drawings#v0.3.0`) — nothing consumes `main`.
+The full publish + consume recipe and the semver policy live in
+[`RELEASING.md`](./RELEASING.md); per-version changes are in
+[`CHANGELOG.md`](./CHANGELOG.md).
+
 ## Usage
 
 ```ts

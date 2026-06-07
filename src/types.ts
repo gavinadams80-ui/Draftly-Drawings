@@ -18,3 +18,10 @@ export interface Section {
 }
 
 export type MemberForm = 'open' | 'b2b' | 'rhs' | 'plate';
+
+/** A section database grouped by structural role. */
+export interface SectionDB {
+  posts: Section[];
+  beams: Section[];
+  rafters: Section[];
+}
