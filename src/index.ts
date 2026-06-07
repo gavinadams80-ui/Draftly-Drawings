@@ -5,7 +5,20 @@
 // exporter lives in a separate entry: `@draftly/drawings/pdf`.
 
 // ── Types ──
-export type { Section, MemberForm } from './types.js';
+export type { Section, MemberForm, SectionDB } from './types.js';
+
+// ── Section catalog (single source of standard sizes + properties) ──
+export {
+  CSECTION_SECTIONS,
+  STEEL_SECTIONS,
+  TIMBER_SECTIONS,
+  ALUMINIUM_SECTIONS,
+  getSectionDB,
+  SECTION_CATALOG,
+  searchSections,
+  type SectionMaterial,
+  type SectionCatalogEntry,
+} from './sections.js';
 
 // ── Shared frame + title block ──
 export {
