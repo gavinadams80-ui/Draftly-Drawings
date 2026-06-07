@@ -41,6 +41,8 @@ export {
 export {
   generateThreeViewSVG,
   generateGableInfillSVG,
+  parseSectionDims,
+  type ParsedDims,
 } from './drawings.js';
 
 // ── Connection details ──
