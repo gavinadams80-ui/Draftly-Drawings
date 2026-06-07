@@ -8,7 +8,7 @@
 
 import type { Section, MemberForm } from './types.js';
 
-interface ParsedDims {
+export interface ParsedDims {
   type: 'C' | 'C2B' | 'C2F' | 'SHS' | 'RHS' | 'RECT';
   d: number;
   b: number;
@@ -17,7 +17,7 @@ interface ParsedDims {
 }
 
 // ── Parse section size string into dimensions ──
-function parseSectionDims(sec: Section): ParsedDims {
+export function parseSectionDims(sec: Section): ParsedDims {
   const size = sec.size || '';
   let d = sec.d || 100;
   let t = sec.t || 2.0;

@@ -64,3 +64,7 @@ export {
   getParamsForDrawing,
   groupParamsByCategory,
 } from './drawingParams.js';
+
+// ── Single editable member profile (for Drafting blocks) ──
+export { generateMemberProfile } from './memberProfile.js';
+export type { MemberView, MemberProfileOptions } from './memberProfile.js';
