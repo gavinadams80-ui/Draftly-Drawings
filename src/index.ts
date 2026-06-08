@@ -29,8 +29,22 @@ export {
 export {
   type TitleBlockData,
   DEFAULT_TITLE_BLOCK,
-  withTitleBlock,
+  TITLE_BLOCK_H,
+  renderTitleBlock,
 } from './titleBlock.js';
+
+// ── Shared drawing sheet (paper-size aware; renders in both apps) ──
+export {
+  type PaperSize,
+  type SheetOptions,
+  SHEET_MM,
+  SHEET_BORDER,
+  sheetPx,
+  getSheetWorkingArea,
+  generateSheetTemplate,
+  placeOnSheet,
+  withTitleBlock,
+} from './sheet.js';
 
 // ── Plan + roof geometry ──
 export {
