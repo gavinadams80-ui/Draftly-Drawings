@@ -14,6 +14,24 @@ Consumers (Draftly-Engineering, Draftly-Drafting) pin a git tag, e.g.
 
 _Nothing yet._
 
+## [0.6.0] — 2026-06-09
+
+### Added
+- **`DesignSet` — the Engineering ⇄ Drafting handover contract (`designSet.ts`).**
+  The shared, versioned payload Engineering emits (geometry + selected sections +
+  per-member checks + loads + schedule + title-block project data) and Drafting
+  ingests to generate drawings, then hands back for re-calculation. New exports:
+  - Types: `DesignSet`, `DesignSetInput`, `DesignMember`, `MemberCheck`,
+    `DesignGeometry`, `DesignResults`, `DesignLoads`, `DesignSchedule`,
+    `ScheduleLine`, `DesignStatus`.
+  - `DESIGNSET_FORMAT`, `DESIGNSET_SCHEMA_VERSION`.
+  - `makeDesignSet` (stamps format/schema/units/generated + derives status),
+    `serializeDesignSet` (→ pretty `.designset.json`), `parseDesignSet` /
+    `validateDesignSet` (throw `DesignSetParseError` on bad input, and reject a
+    schema newer than the library supports), `computeDesignStatus`.
+  - `project` reuses the shared `TitleBlockData`; each member carries a stable
+    `id` matching Drafting's `data-member-id`, so edits survive the round-trip.
+
 ## [0.5.0] — 2026-06-08
 
 ### Added
@@ -78,7 +96,8 @@ _Nothing yet._
   plan, three-view member preview, gable infill) with the DOM-dependent PDF
   exporter isolated in the `@draftly/drawings/pdf` entry.
 
-[Unreleased]: https://github.com/gavinadams80-ui/Draftly-Drawings/compare/v0.5.0...HEAD
+[Unreleased]: https://github.com/gavinadams80-ui/Draftly-Drawings/compare/v0.6.0...HEAD
+[0.6.0]: https://github.com/gavinadams80-ui/Draftly-Drawings/compare/v0.5.0...v0.6.0
 [0.5.0]: https://github.com/gavinadams80-ui/Draftly-Drawings/compare/v0.4.0...v0.5.0
 [0.4.0]: https://github.com/gavinadams80-ui/Draftly-Drawings/compare/v0.3.0...v0.4.0
 [0.3.0]: https://github.com/gavinadams80-ui/Draftly-Drawings/compare/v0.2.1...v0.3.0

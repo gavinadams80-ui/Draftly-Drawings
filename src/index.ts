@@ -46,6 +46,28 @@ export {
   withTitleBlock,
 } from './sheet.js';
 
+// ── DesignSet — the Engineering ⇄ Drafting handover contract ──
+export {
+  type DesignSet,
+  type DesignSetInput,
+  type DesignMember,
+  type MemberCheck,
+  type DesignGeometry,
+  type DesignResults,
+  type DesignLoads,
+  type DesignSchedule,
+  type ScheduleLine,
+  type DesignStatus,
+  DESIGNSET_FORMAT,
+  DESIGNSET_SCHEMA_VERSION,
+  DesignSetParseError,
+  computeDesignStatus,
+  makeDesignSet,
+  serializeDesignSet,
+  validateDesignSet,
+  parseDesignSet,
+} from './designSet.js';
+
 // ── Plan + roof geometry ──
 export {
   generateRoofGeometrySVG,
