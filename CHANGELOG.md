@@ -14,6 +14,29 @@ Consumers (Draftly-Engineering, Draftly-Drafting) pin a git tag, e.g.
 
 _Nothing yet._
 
+## [0.5.0] — 2026-06-08
+
+### Added
+- **Paper-size-aware shared sheet (`sheet.ts`)** — one drawing-sheet template both
+  apps render, so a Drafting sheet and an Engineering submission sheet are
+  identical by construction. New exports:
+  - `PaperSize` ('A4' | 'A3' | 'A2' | 'A1'), `SHEET_MM`, `SHEET_BORDER`,
+    `sheetPx(size)`, `getSheetWorkingArea(size)`.
+  - `generateSheetTemplate(tb, title, number, opts)` — the blank sheet "stencil"
+    (border + working-area frame + AS1100 title block, no content) for dropping
+    onto a paper-space layout.
+  - `placeOnSheet(svg, tb, title, number, opts)` — generalises the A3-only
+    composer to any paper size, scaling + centring the drawing in the working area.
+  - `SheetOptions` ({ paperSize, sheet, totalSheets, scale }).
+- `renderTitleBlock` and `TITLE_BLOCK_H` are now exported from `titleBlock.ts`
+  for reuse by sheet composition and consumers.
+
+### Changed
+- `withTitleBlock()` is preserved with its exact signature and A3 output
+  (`1190×842`) for Engineering's existing call sites; it now delegates to
+  `placeOnSheet('A3', …)`. Its source moved from `titleBlock.ts` to `sheet.ts`
+  (re-exported from the package root — no consumer change required).
+
 ## [0.4.0] — 2026-06-08
 
 ### Added
@@ -55,7 +78,8 @@ _Nothing yet._
   plan, three-view member preview, gable infill) with the DOM-dependent PDF
   exporter isolated in the `@draftly/drawings/pdf` entry.
 
-[Unreleased]: https://github.com/gavinadams80-ui/Draftly-Drawings/compare/v0.4.0...HEAD
+[Unreleased]: https://github.com/gavinadams80-ui/Draftly-Drawings/compare/v0.5.0...HEAD
+[0.5.0]: https://github.com/gavinadams80-ui/Draftly-Drawings/compare/v0.4.0...v0.5.0
 [0.4.0]: https://github.com/gavinadams80-ui/Draftly-Drawings/compare/v0.3.0...v0.4.0
 [0.3.0]: https://github.com/gavinadams80-ui/Draftly-Drawings/compare/v0.2.1...v0.3.0
 [0.2.1]: https://github.com/gavinadams80-ui/Draftly-Drawings/compare/v0.2.0...v0.2.1
