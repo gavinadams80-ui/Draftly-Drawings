@@ -1,6 +1,6 @@
 {
   "name": "@draftly/drawings",
-  "version": "0.9.1",
+  "version": "0.10.0",
   "description": "Shared, framework-agnostic SVG drawing generators for the Draftly apps (Engineering + Drafting).",
   "type": "module",
   "license": "UNLICENSED",

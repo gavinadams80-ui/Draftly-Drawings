@@ -21,7 +21,16 @@ export function generateRoofGeometrySVG(
   const rise       = (actualSpan / 2) * Math.tan(pitch * Math.PI / 180);
   const rafterLen  = Math.sqrt(Math.pow(actualSpan / 2, 2) + Math.pow(rise, 2));
 
-  const sc   = Math.min(drawW / actualSpan, drawH / Math.max(rise, 0.5)) * 0.82;
+  // Expected building (ridge) height = eave/wall height + ridge rise.
+  const buildingHeight = height + rise;
+
+  // ── Scale ── PITCH-INDEPENDENT: anchored to the span (and a fixed 45° reference
+  // rise), NOT to the current rise. The old `drawH / rise` term re-normalised the
+  // triangle to fill the panel, so a steeper pitch never looked any taller. Sizing
+  // the panel for a fixed reference pitch keeps the scale constant across pitches,
+  // so the drawn apex height becomes a true function of pitch — steeper visibly climbs.
+  const refRise = (actualSpan / 2) * Math.tan(45 * Math.PI / 180);
+  const sc   = Math.min(drawW / actualSpan, drawH / Math.max(refRise, 0.5)) * 0.82;
   const triW = actualSpan * sc;
   const triH = rise * sc;
 
@@ -58,6 +67,14 @@ export function generateRoofGeometrySVG(
     svg += `<text x="${apexX}" y="${apexY - 24}" text-anchor="middle" font-family="${mono}" font-size="8.5" fill="${rafterCol}" font-weight="600">RIDGE</text>`;
     // Dotted leader from label down to apex node
     svg += `<line x1="${apexX}" y1="${apexY - 19}" x2="${apexX}" y2="${apexY - 5}" stroke="${rafterCol}" stroke-width="0.6" stroke-dasharray="2,2" opacity="0.6"/>`;
+
+    // ── BUILDING HEIGHT readout (eave + rise) — top-left callout ──
+    // The headline number is the expected ridge height above ground; it changes
+    // with pitch (via rise) so Section 3 reflects pitch on both the figure and the value.
+    const bhX = margin.left - 6, bhY = margin.top - 6;
+    svg += `<text x="${bhX}" y="${bhY}" text-anchor="start" font-family="${mono}" font-size="7" fill="${dimCol}">BUILDING HEIGHT (TO RIDGE)</text>`;
+    svg += `<text x="${bhX}" y="${bhY + 15}" text-anchor="start" font-family="${mono}" font-size="13" fill="${rafterCol}" font-weight="700">${buildingHeight.toFixed(2)}m</text>`;
+    svg += `<text x="${bhX}" y="${bhY + 27}" text-anchor="start" font-family="${mono}" font-size="6.5" fill="${dimCol}">= eave ${height.toFixed(2)}m + rise ${rise.toFixed(3)}m</text>`;
 
     // ── POST markers ──
     svg += `<circle cx="${leftX}"  cy="${baseY}" r="5" fill="${frameCol}" opacity="0.9"/>`;
@@ -152,7 +169,8 @@ export function generateRoofGeometrySVG(
       `Rise:        ${rise.toFixed(3)}m`,
       `Rafter:      ${rafterLen.toFixed(3)}m`,
       `Pitch:       ${pitch}°`,
-      `Gable H:     ${height.toFixed(2)}m`,
+      `Eave H:      ${height.toFixed(2)}m`,
+      `Ridge H:     ${buildingHeight.toFixed(2)}m`,
     ];
     stats.forEach((s, i) => {
       svg += `<text x="${W - 10}" y="${margin.top + 12 + i * 14}" text-anchor="end" font-family="${mono}" font-size="8" fill="${dimCol}">${s}</text>`;
@@ -172,7 +190,11 @@ export function generateRoofGeometrySVG(
     const pitchRad     = pitch * Math.PI / 180;
     const riseSk       = actualSpan * Math.tan(pitchRad);
     const rafterLenSk  = Math.sqrt(actualSpan * actualSpan + riseSk * riseSk);
-    const scSk         = Math.min(drawW / actualSpan, drawH / Math.max(riseSk, 0.5)) * 0.82;
+    const buildingHeightSk = height + riseSk; // high-side wall = low eave + fall
+    // Pitch-independent scale (anchored to a 45° reference rise across the span),
+    // so a steeper skillion visibly climbs instead of being re-normalised to fill.
+    const refRiseSk    = actualSpan * Math.tan(45 * Math.PI / 180);
+    const scSk         = Math.min(drawW / actualSpan, drawH / Math.max(refRiseSk, 0.5)) * 0.82;
     const triWSk       = actualSpan * scSk;
     const triHSk       = riseSk * scSk;
     const leftXSk      = margin.left + (drawW - triWSk) / 2;
@@ -199,6 +221,13 @@ export function generateRoofGeometrySVG(
     // ── Eave labels ──
     svg += `<text x="${leftXSk}"  y="${topYSk - 8}" text-anchor="middle" font-family="${mono}" font-size="8.5" fill="${rafterCol}" font-weight="600">HIGH EAVE</text>`;
     svg += `<text x="${rightXSk + 4}" y="${lowYSk - 8}" text-anchor="start" font-family="${mono}" font-size="8.5" fill="${rafterCol}" font-weight="600">LOW EAVE</text>`;
+
+    // ── BUILDING HEIGHT readout (low eave + fall) — top-left callout ──
+    // Headline = expected high-side wall height; grows with pitch via the fall.
+    const bhX = margin.left - 6, bhY = margin.top - 6;
+    svg += `<text x="${bhX}" y="${bhY}" text-anchor="start" font-family="${mono}" font-size="7" fill="${dimCol}">BUILDING HEIGHT (HIGH SIDE)</text>`;
+    svg += `<text x="${bhX}" y="${bhY + 15}" text-anchor="start" font-family="${mono}" font-size="13" fill="${rafterCol}" font-weight="700">${buildingHeightSk.toFixed(2)}m</text>`;
+    svg += `<text x="${bhX}" y="${bhY + 27}" text-anchor="start" font-family="${mono}" font-size="6.5" fill="${dimCol}">= eave ${height.toFixed(2)}m + fall ${riseSk.toFixed(3)}m</text>`;
 
     // ── Rafter length label (rotated along slope) ──
     const dmX = (leftXSk + rightXSk) / 2;
