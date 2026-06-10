@@ -14,6 +14,33 @@ Consumers (Draftly-Engineering, Draftly-Drafting) pin a git tag, e.g.
 
 _Nothing yet._
 
+## [0.11.0] — 2026-06-11
+
+### Added
+- **Ridge orientation + per-side attachment carried through the handover.**
+  `DesignGeometry` gains optional `ridgeAxis` (`'width' | 'depth'` — the
+  footprint dimension the ridge line runs parallel to) and `attachedSides`
+  (`BuildingSide[]` — which faces attach to the existing dwelling, e.g.
+  `['back','left','right']`). These are set authoritatively in Intelligence so
+  Drafting never re-guesses the orientation. New `BuildingSide` type plus two
+  pure helpers: `frameSpanAxis(geometry)` (the dimension the portal frames span =
+  perpendicular to the ridge) and `crossSectionSpanMm(geometry)` (the clear span
+  the A-A/B-B/C-C wall sections are cut at). Both default to the legacy
+  assumption (ridge ∥ depth, frames span the width) when `ridgeAxis` is absent,
+  so older exports render unchanged.
+- **Building plan honours the ridge axis.** `generateBuildingPlanSVG` accepts
+  `opts.ridgeAxis` + `opts.attachedSides`. With `ridgeAxis:'width'` the interior
+  re-orients — horizontal ridge, purlins across the depth, portal frames running
+  the full depth spaced across the width, posts/connections at each end (open
+  side = the non-attached side). The legacy `'depth'` path is kept verbatim, so
+  the footprint + dwelling walls and all existing output are unchanged.
+  (Side-elevation re-orientation + skillion fall direction still to come.)
+- **Gable infill droppers in the wall section.** `generateWallSectionSVG` accepts
+  `opts.gableInfill = { bays, section? }`; on a gable-end section it draws the
+  vertical droppers dividing the gable triangle into `bays` equal bays (mullions
+  from the bottom-chord level up to the rafter underside) and calls out the
+  dropper section. Absent ⇒ no change.
+
 ## [0.8.0] — 2026-06-10
 
 ### Added

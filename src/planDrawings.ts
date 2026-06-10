@@ -296,9 +296,20 @@ export function generateBuildingPlanSVG(
   rightSetback: number = 0,    // m — right wall stops this far from front
   _purlinSpacing: number = 1.35, // m — from engineering calc
   northRotation: number = 0,   // degrees clockwise — 0 = north is up
-  opts: { scale?: number; annotate?: boolean } = {},  // view-layer: scale (units per mm; omit = legacy page-fit) + annotation toggle
+  // view-layer + orientation. `ridgeAxis` ('width' = ridge runs along the width;
+  // 'depth' = legacy, ridge front-to-back) is set authoritatively in Intelligence;
+  // it flips the ridge/purlin/frame interior. `attachedSides` (which faces fix to
+  // the dwelling) leaves the open side = the non-attached side.
+  opts: {
+    scale?: number; annotate?: boolean;
+    ridgeAxis?: 'width' | 'depth';
+    attachedSides?: ('back' | 'front' | 'left' | 'right')[];
+  } = {},
 ): string {
   const annotate = opts.annotate ?? true;
+  // Ridge along the width ⇒ horizontal ridge, frames span the depth (perpendicular).
+  // Default 'depth' reproduces the legacy interior exactly (zero behaviour change).
+  const ridgeAlongWidth = opts.ridgeAxis === 'width';
   const W = 700, H = 580;
   const mono = 'DM Mono,monospace';
 
@@ -559,6 +570,13 @@ export function generateBuildingPlanSVG(
   }
 
   // ══════════════════════════════════════════════════════════════════
+  // INTERIOR (ridge · purlins · frames · posts · ledger · connection)
+  // Two orientations: the legacy path (ridge ∥ depth, frames span the width) is
+  // kept verbatim; the `else` draws the ridge ∥ width case (frames span the
+  // depth). The footprint + dwelling walls above are shared by both.
+  // ══════════════════════════════════════════════════════════════════
+  if (!ridgeAlongWidth) {
+  // ══════════════════════════════════════════════════════════════════
   // RIDGE BEAM (centre vertical dashed line)
   // ══════════════════════════════════════════════════════════════════
   if (isGable) {
@@ -674,6 +692,81 @@ export function generateBuildingPlanSVG(
       svg += `<rect x="${rcX - 5}" y="${frameTopY - 5}" width="10" height="10" fill="none" stroke="${ridgeCol}" stroke-width="1.4"/>`;
       svg += `<line x1="${rcX - 5}" y1="${frameTopY - 5}" x2="${rcX + 5}" y2="${frameTopY + 5}" stroke="${ridgeCol}" stroke-width="0.9"/>`;
       svg += `<line x1="${rcX + 5}" y1="${frameTopY - 5}" x2="${rcX - 5}" y2="${frameTopY + 5}" stroke="${ridgeCol}" stroke-width="0.9"/>`;
+    }
+  }
+  } else {
+    // ══════════════════════════════════════════════════════════════════
+    // RIDGE ∥ WIDTH — frames span the DEPTH (Intelligence-set orientation)
+    // Ridge is a horizontal centreline; purlins march from it to the back +
+    // front eaves across the depth; frames run top→bottom (full depth), spaced
+    // across the width, with posts at both ends. Open side = non-attached side.
+    // ══════════════════════════════════════════════════════════════════
+    const sides = opts.attachedSides;
+    const frontOpen = sides ? !sides.includes('front') : true;
+    const backAttached = attachment !== 'freestanding' && (!sides || sides.includes('back'));
+
+    // Frame X positions — spaced across the width; each frame spans the full depth.
+    const frameXs: number[] = [];
+    const spanXpx = frameRightX - frameLeftX;
+    if (portalFrameCount === 1) frameXs.push(frameMidX);
+    else for (let i = 0; i < portalFrameCount; i++) frameXs.push(frameLeftX + (i / (portalFrameCount - 1)) * spanXpx);
+
+    // RIDGE — horizontal centreline at mid-depth.
+    if (isGable) {
+      svg += `<line x1="${frameLeftX}" y1="${frameMidY}" x2="${frameRightX}" y2="${frameMidY}" stroke="${ridgeCol}" stroke-width="1.8" stroke-dasharray="6,3"/>`;
+      svg += `<text x="${frameMidX + 4}" y="${frameMidY - 3}" font-family="${mono}" font-size="6" fill="${ridgeCol}">RIDGE</text>`;
+    }
+
+    // PURLINS — parallel to the ridge (horizontal), spaced across the depth.
+    if (isGable) {
+      const halfPx = frameMidY - frameTopY, halfM = halfPx / sc;
+      const step = (halfM - nearRidge) / 4;
+      const pm = [nearRidge, nearRidge + step, nearRidge + step * 2, nearRidge + step * 3, halfM];
+      for (let i = 0; i < pm.length; i++) {
+        const isEave = i === pm.length - 1;
+        const sw = isEave ? 1.0 : 0.6, da = isEave ? '6,3' : '3,4';
+        const yT = frameMidY - (pm[i] / halfM) * halfPx, yB = frameMidY + (pm[i] / halfM) * halfPx;
+        svg += `<line x1="${frameLeftX}" y1="${yT}" x2="${frameRightX}" y2="${yT}" stroke="${purlinCol}" stroke-width="${sw}" stroke-dasharray="${da}" opacity="0.7"/>`;
+        svg += `<line x1="${frameLeftX}" y1="${yB}" x2="${frameRightX}" y2="${yB}" stroke="${purlinCol}" stroke-width="${sw}" stroke-dasharray="${da}" opacity="0.7"/>`;
+      }
+    } else {
+      const fullPx = frameBotY - frameTopY, fullM = fullPx / sc;
+      const step = (fullM - skNearM) / (skillionN - 1);
+      for (let i = 0; i < skillionN; i++) {
+        const mm = skNearM + i * step;
+        const isEave = i === 0 || i === skillionN - 1;
+        const sw = isEave ? 1.0 : 0.6, da = isEave ? '6,3' : '3,4';
+        const y = frameTopY + (mm / fullM) * fullPx;
+        svg += `<line x1="${frameLeftX}" y1="${y}" x2="${frameRightX}" y2="${y}" stroke="${purlinCol}" stroke-width="${sw}" stroke-dasharray="${da}" opacity="0.7"/>`;
+      }
+    }
+
+    // PORTAL FRAMES — vertical lines spanning the depth, with end posts/connections.
+    const ps2 = 7;
+    for (const fx of frameXs) {
+      svg += `<line x1="${fx}" y1="${frameTopY}" x2="${fx}" y2="${frameBotY}" stroke="${frameCol}" stroke-width="2.2"/>`;
+      if (isGable) {
+        svg += `<polygon points="${fx},${frameMidY - 5} ${fx + 4},${frameMidY} ${fx},${frameMidY + 5} ${fx - 4},${frameMidY}" fill="${ridgeCol}" opacity="0.9"/>`;
+      }
+      // Back end (top): connection to the dwelling when attached, else post.
+      if (backAttached) {
+        svg += `<circle cx="${fx}" cy="${frameTopY}" r="4.5" fill="none" stroke="${standoffCol}" stroke-width="1.5"/>`;
+        svg += `<circle cx="${fx}" cy="${frameTopY}" r="1.8" fill="${standoffCol}"/>`;
+      } else {
+        svg += `<rect x="${fx - ps2 / 2}" y="${frameTopY - ps2 / 2}" width="${ps2}" height="${ps2}" fill="${postCol}" stroke="rgba(0,0,0,0.4)" stroke-width="0.5"/>`;
+      }
+      // Front end (bottom): post on the open side, connection if attached.
+      if (frontOpen) {
+        svg += `<rect x="${fx - ps2 / 2}" y="${frameBotY - ps2 / 2}" width="${ps2}" height="${ps2}" fill="${postCol}" stroke="rgba(0,0,0,0.4)" stroke-width="0.5"/>`;
+      } else {
+        svg += `<circle cx="${fx}" cy="${frameBotY}" r="4.5" fill="none" stroke="${standoffCol}" stroke-width="1.5"/>`;
+        svg += `<circle cx="${fx}" cy="${frameBotY}" r="1.8" fill="${standoffCol}"/>`;
+      }
+    }
+
+    // LEDGER — bears on the attached back wall (the dwelling eave).
+    if (backAttached) {
+      svg += `<line x1="${frameLeftX}" y1="${frameTopY}" x2="${frameRightX}" y2="${frameTopY}" stroke="${frameCol}" stroke-width="2.8"/>`;
     }
   }
 

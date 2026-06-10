@@ -40,6 +40,9 @@ export interface DesignMember {
   check?: MemberCheck;
 }
 
+/** A face of the rectangular building footprint, in plan. */
+export type BuildingSide = 'back' | 'front' | 'left' | 'right';
+
 /** Building geometry — mirrors Engineering's `config`. Lengths in mm, angles in degrees. */
 export interface DesignGeometry {
   structureType: string;            // e.g. 'carport' | 'patio' | 'shed'
@@ -54,6 +57,40 @@ export interface DesignGeometry {
   setbacks?: { left?: number; right?: number; front?: number; back?: number };
   northRotation?: number;
   cladding?: string;
+  /**
+   * Which faces of the footprint attach to the EXISTING DWELLING — set in
+   * Intelligence's site layout (e.g. `['back','left','right']`). `attachment`
+   * says HOW MANY sides are attached; `attachedSides` says WHICH. The drawings
+   * orient themselves from this so the dwelling isn't always assumed to be on
+   * the back face. Optional/empty ⇒ legacy assumption (dwelling on `back`, or
+   * none for freestanding).
+   */
+  attachedSides?: BuildingSide[];
+  /**
+   * The footprint dimension the RIDGE LINE runs PARALLEL to, set authoritatively
+   * in Intelligence so Drafting never re-guesses it. The portal frames span the
+   * PERPENDICULAR dimension, and the wall-section (A-A/B-B/C-C) span equals that
+   * frame span. Omitted ⇒ legacy assumption `'depth'` (ridge runs front-to-back,
+   * frames span the width).
+   */
+  ridgeAxis?: 'width' | 'depth';
+}
+
+/**
+ * The footprint dimension the portal frames span — perpendicular to the ridge.
+ * This is the span the cross-section (A-A/B-B/C-C) is cut at. Legacy default:
+ * ridge ∥ depth ⇒ frames span the width.
+ */
+export function frameSpanAxis(g: Pick<DesignGeometry, 'ridgeAxis'>): 'width' | 'depth' {
+  return (g.ridgeAxis ?? 'depth') === 'depth' ? 'width' : 'depth';
+}
+
+/**
+ * The clear cross-section span (mm) the wall sections should be drawn at — the
+ * frame span, i.e. the footprint dimension perpendicular to the ridge.
+ */
+export function crossSectionSpanMm(g: DesignGeometry): number {
+  return frameSpanAxis(g) === 'width' ? g.width : g.depth;
 }
 
 /** One downpipe in the stormwater design — its rated capacity and the area it drains. */

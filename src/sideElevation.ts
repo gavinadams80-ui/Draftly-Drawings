@@ -11,6 +11,7 @@ const lineCol = '#c8cce0';
 const dimCol = '#9aa0bc';
 const steelCol = '#c9a84c';
 const groundCol = '#6db87a';
+const purlinCol = '#4a7090';
 
 export function generateSideElevationSVG(
   depthM: number,
@@ -24,7 +25,14 @@ export function generateSideElevationSVG(
   // generateWallSectionSVG, so the two views agree. Optional; when absent the
   // existing dwelling falls back to the previous (new-ridge-height) behaviour.
   heights: WallSectionHeights = {},
-  opts: { scale?: number; annotate?: boolean } = {},  // view-layer: scale (units per mm; omit = legacy page-fit) + annotation toggle
+  // view-layer (scale / annotate) + the dimensions the projected side view needs:
+  // `rafterMm` = the upright width (= rafter section depth in plan); `purlinSpacingM`
+  // = the along-rake purlin spacing, used to project the purlins across at their
+  // foreshortened heights.
+  opts: {
+    scale?: number; annotate?: boolean;
+    rafterMm?: number; purlinSpacingM?: number;
+  } = {},
 ): string {
   const annotate = opts.annotate ?? true;
   const VB_W = 720;
@@ -32,7 +40,11 @@ export function generateSideElevationSVG(
   const ML = 60, MR = 70, MT = 40, MB = 70;
 
   const rise = (isGable ? widthM / 2 : widthM) * Math.tan((pitchDeg * Math.PI) / 180);
-  const ridgeM = eaveHeightM + Math.max(0, rise);
+  // Peak height: use the as-sited ridge height when handed over (the SAME value
+  // generateWallSectionSVG sets its apex to), so the side view reaches exactly the
+  // gable section's peak and the two project across at a common height. Fall back
+  // to the pitch-derived rise for older exports.
+  const ridgeM = heights.ridgeHeight != null ? heights.ridgeHeight / 1000 : eaveHeightM + Math.max(0, rise);
 
   const drawW = VB_W - ML - MR;
   const drawH = VB_H - MT - MB;
@@ -81,20 +93,33 @@ export function generateSideElevationSVG(
     }
   }
 
-  // Posts along the depth
+  // ── UPRIGHTS — one per portal frame, projected edge-on ──
+  // Each frame projects to a rafter-width vertical from the ground (FFL) up to the
+  // ridge peak — the same height as the gable triangle. Spaced along the run.
   const nPosts = Math.max(2, portalCount);
+  const upMm = opts.rafterMm ?? 150;
+  const upW  = Math.max(2, (upMm / 1000) * sc);   // rafter width in view units
+  const peakY = Y(ridgeM);
   const postXs: number[] = [];
   for (let i = 0; i < nPosts; i++) {
     const m = (i / (nPosts - 1)) * depthM;
     postXs.push(m);
     const px = X(m);
-    s += `<line x1="${px}" y1="${groundY}" x2="${px}" y2="${Y(eaveHeightM)}" stroke="${steelCol}" stroke-width="2.2"/>`;
+    s += `<rect x="${(px - upW / 2).toFixed(1)}" y="${peakY.toFixed(1)}" width="${upW.toFixed(1)}" height="${(groundY - peakY).toFixed(1)}" fill="rgba(201,168,76,0.18)" stroke="${steelCol}" stroke-width="1.4"/>`;
     // footing
     s += `<rect x="${px - 5}" y="${groundY}" width="10" height="9" fill="rgba(201,168,76,0.25)" stroke="${steelCol}" stroke-width="0.6"/>`;
   }
 
   // Eave / fascia line (front edge of roof) and ridge line
   s += `<line x1="${X(0)}" y1="${Y(eaveHeightM)}" x2="${X(depthM)}" y2="${Y(eaveHeightM)}" stroke="${steelCol}" stroke-width="2.2"/>`;
+
+  // ── FASCIA DATUM ── bottom of fascia (constant level) for cross-view alignment —
+  // the SAME reference generateWallSectionSVG emits, so the importer hangs both
+  // elevation views off one line. Model-only; tagged out of drawn geometry.
+  if (!annotate) {
+    const fasciaY = heights.fasciaHeight != null ? Y(heights.fasciaHeight / 1000) : Y(eaveHeightM);
+    s += `<line data-datum="fascia" x1="0" y1="${fasciaY.toFixed(1)}" x2="0" y2="${fasciaY.toFixed(1)}" stroke="none"/>`;
+  }
   if (ridgeM > eaveHeightM + 0.01) {
     const highLabel = isGable ? 'RIDGE LINE (beyond)' : 'HIGH EAVE (beyond)';
     s += `<line x1="${X(0)}" y1="${Y(ridgeM)}" x2="${X(depthM)}" y2="${Y(ridgeM)}" stroke="${steelCol}" stroke-width="1.4" stroke-dasharray="6,3"/>`;
@@ -102,6 +127,22 @@ export function generateSideElevationSVG(
     // light roof slope hints at the near rake end
     s += `<line x1="${X(0)}" y1="${Y(eaveHeightM)}" x2="${X(0)}" y2="${Y(ridgeM)}" stroke="${steelCol}" stroke-width="0.8" opacity="0.5"/>`;
     s += `<line x1="${X(depthM)}" y1="${Y(eaveHeightM)}" x2="${X(depthM)}" y2="${Y(ridgeM)}" stroke="${steelCol}" stroke-width="0.8" opacity="0.5"/>`;
+  }
+
+  // ── PURLINS — projected from the end view ──
+  // Purlins sit on the rake; projected onto the side they appear as horizontal
+  // lines at their heights (eave→ridge), so their apparent spacing is foreshortened
+  // by the pitch. Count follows the along-rake purlin spacing.
+  if (isGable && ridgeM > eaveHeightM + 0.01) {
+    const halfSpanM = widthM / 2;
+    const rakeLenM = halfSpanM / Math.max(0.2, Math.cos((pitchDeg * Math.PI) / 180));
+    const spacing = Math.max(0.3, opts.purlinSpacingM ?? 1.2);
+    const n = Math.min(8, Math.max(5, Math.round(rakeLenM / spacing)));
+    for (let k = 1; k < n; k++) {
+      const f = k / n;                                   // rake fraction eave→ridge
+      const hM = eaveHeightM + f * (ridgeM - eaveHeightM);
+      s += `<line x1="${X(0).toFixed(1)}" y1="${Y(hM).toFixed(1)}" x2="${X(depthM).toFixed(1)}" y2="${Y(hM).toFixed(1)}" stroke="${purlinCol}" stroke-width="0.8" stroke-dasharray="5,3" opacity="0.75"/>`;
+    }
   }
 
   // ── Dimensions + title — annotation layer (omitted from the 1:1 model) ──
