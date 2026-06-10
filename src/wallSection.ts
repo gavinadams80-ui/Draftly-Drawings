@@ -50,7 +50,14 @@ export function generateWallSectionSVG(
   isGable         = true,              // false → skillion (mono-pitch) cross-section
   rafterD         = 250,               // mm — rafter section depth (from engineering)
   heights: WallSectionHeights = {},    // as-sited vertical setout from the DesignSet (all optional)
-  opts: { scale?: number; annotate?: boolean } = {},  // view-layer concerns (see below)
+  // view-layer concerns (see below) + optional gable infill. When `gableInfill`
+  // is present on a gable-end section, vertical droppers divide the gable triangle
+  // into `bays` equal bays (the gable.bays from the design); `section` is the
+  // dropper size called out on the drawing.
+  opts: {
+    scale?: number; annotate?: boolean;
+    gableInfill?: { bays: number; section?: string };
+  } = {},
 ): string {
   // 1:1 PRINCIPLE — geometry is real-mm; a "scale" only ever belongs to the
   // viewing window (paperspace viewport / viewBox), never baked into coordinates.
@@ -457,6 +464,29 @@ export function generateWallSectionSVG(
     [rBearX, eaveTopY ],
     [ridgeX, ridgeTopY],
   ], rafterFill, rafterCol, 0.8);
+
+  // ── GABLE INFILL — vertical droppers dividing the gable into bays ──
+  // Cladding mullions from the bottom-chord level (bearY) up to the rafter
+  // underside, at equal bay divisions across the span. Interior lines only — the
+  // end bays land on the wall/column faces. With an even bay count the centre
+  // dropper reaches the apex (king post), matching generateGableInfillSVG.
+  if (opts.gableInfill && opts.gableInfill.bays > 1) {
+    const dropCol = '#8bc34a';
+    const undersideY = (x: number) => x <= ridgeX
+      ? bearY + (ridgeY - bearY) * (x - lBearX) / (ridgeX - lBearX)
+      : ridgeY + (bearY - ridgeY) * (x - ridgeX) / (rBearX - ridgeX);
+    const bays = Math.round(opts.gableInfill.bays);
+    for (let i = 1; i < bays; i++) {
+      const x = lBearX + (i / bays) * (rBearX - lBearX);
+      svg += ln(x, bearY, x, undersideY(x), dropCol, 1.2);
+    }
+    if (annotate) {
+      const note = opts.gableInfill.section
+        ? `GABLE INFILL: ${opts.gableInfill.section} @ ${bays} bays`
+        : `GABLE INFILL: ${bays} bays`;
+      svg += `<text x="${r(midX)}" y="${r(bearY + 14)}" font-family="DM Mono,monospace" font-size="8" fill="${dropCol}" text-anchor="middle">${note}</text>`;
+    }
+  }
 
   // ── RIDGE FLASHING — standard Australian angular ridge cap ──
   // Profile: 150mm legs each side, flat crown ~60mm, sits on top of roof sheets.

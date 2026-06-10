@@ -35,6 +35,11 @@ _Nothing yet._
   side = the non-attached side). The legacy `'depth'` path is kept verbatim, so
   the footprint + dwelling walls and all existing output are unchanged.
   (Side-elevation re-orientation + skillion fall direction still to come.)
+- **Gable infill droppers in the wall section.** `generateWallSectionSVG` accepts
+  `opts.gableInfill = { bays, section? }`; on a gable-end section it draws the
+  vertical droppers dividing the gable triangle into `bays` equal bays (mullions
+  from the bottom-chord level up to the rafter underside) and calls out the
+  dropper section. Absent ⇒ no change.
 
 ## [0.8.0] — 2026-06-10
 
