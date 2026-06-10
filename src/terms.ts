@@ -14,7 +14,12 @@
 
 // ── Canonical enumerations (use these unions everywhere) ──
 export type StructureType = 'carport' | 'patio' | 'pergola' | 'verandah';
-export type RoofType = 'gable' | 'skillion' | 'hip';
+// Roof forms to design across all materials. gable/skillion/hip are the core
+// set; flat/dutch-gable/pyramid/curved/flyover are the broader pergola/patio
+// shapes (proposed — confirm terminology).
+export type RoofType =
+  | 'gable' | 'skillion' | 'hip' | 'flat'
+  | 'dutch-gable' | 'pyramid' | 'curved' | 'flyover';
 export type Attachment = 'freestanding' | 'attached' | 'three-side';
 /** Portal-frame position along the depth (drives the section variant: A-A/B-B/C-C). */
 export type FrameType = 'back' | 'intermediate' | 'front';
@@ -24,7 +29,7 @@ export type MemberRole =
   | 'bottomChord' | 'gableChord' | 'gableDropper' | 'brace' | 'knee';
 
 export type TermCategory =
-  | 'Structure form' | 'Geometry' | 'Member' | 'Set-out height'
+  | 'Structure form' | 'Roof form' | 'Geometry' | 'Member' | 'Set-out height'
   | 'Wall build-up' | 'Connection' | 'Roof / cladding' | 'Drainage';
 
 export interface GlossaryTerm {
@@ -37,6 +42,8 @@ export interface GlossaryTerm {
   aliases?: string[];
   /** Code field/key this maps to in the DesignSet / DrawingParams, where applicable. */
   field?: string;
+  /** Roof type(s) this term is specific to (omitted = applies across all forms). */
+  roofTypes?: RoofType[];
   unit?: string;
 }
 
@@ -51,6 +58,24 @@ export const GLOSSARY: GlossaryTerm[] = [
     definition: 'How it ties to the dwelling: freestanding / attached / three-side.' },
   { term: 'frame type', category: 'Structure form', field: 'frameType',
     definition: 'Portal-frame position along the depth — back / intermediate / front (sections A-A / B-B / C-C).' },
+
+  // Roof form (the shapes to design across all materials)
+  { term: 'gable roof', category: 'Roof form', roofTypes: ['gable'],
+    definition: 'Pitched both sides to a central ridge; triangular gable ends.' },
+  { term: 'skillion roof', category: 'Roof form', roofTypes: ['skillion'], aliases: ['mono-pitch', 'lean-to'],
+    definition: 'Single mono-pitch plane falling from a high eave to a low eave.' },
+  { term: 'hip roof', category: 'Roof form', roofTypes: ['hip'],
+    definition: 'Slopes down on all sides to the eaves; no gable end.' },
+  { term: 'flat roof', category: 'Roof form', roofTypes: ['flat'],
+    definition: 'Near-level single plane with a slight fall for drainage.' },
+  { term: 'dutch gable', category: 'Roof form', roofTypes: ['dutch-gable'], aliases: ['gablet'],
+    definition: 'A hip roof with a small gable (gablet) at the apex.' },
+  { term: 'pyramid roof', category: 'Roof form', roofTypes: ['pyramid'], aliases: ['pyramid hip'],
+    definition: 'Four hips rising to a central apex point (square / near-square plan).' },
+  { term: 'curved roof', category: 'Roof form', roofTypes: ['curved'], aliases: ['bullnose'],
+    definition: 'Convex curved roof sheet (e.g. bullnose verandah).' },
+  { term: 'flyover roof', category: 'Roof form', roofTypes: ['flyover'], aliases: ['raised', 'flyover patio'],
+    definition: 'Roof raised on posts to pass OVER the existing dwelling eave/fascia.' },
 
   // Geometry
   { term: 'span', category: 'Geometry', field: 'width', aliases: ['width'], unit: 'mm',
@@ -71,6 +96,10 @@ export const GLOSSARY: GlossaryTerm[] = [
     definition: 'Between two walls — the difference between their face positions (e.g. a side wall stopping short of the front). DISTINCT from standoff.' },
   { term: 'north rotation', category: 'Geometry', field: 'northRotation', unit: 'degrees',
     definition: 'Clockwise rotation of true north relative to the plan (0 = north up).' },
+  { term: 'fall', category: 'Geometry', roofTypes: ['skillion', 'flat'], unit: 'mm/m',
+    definition: 'Drainage gradient of a skillion or flat roof.' },
+  { term: 'spring point', category: 'Geometry', roofTypes: ['curved'], aliases: ['spring line'],
+    definition: 'Where a curved (bullnose) roof begins to curve from the straight.' },
 
   // Members
   { term: 'rafter', category: 'Member', definition: 'Sloping roof member from eave to apex.' },
@@ -85,6 +114,31 @@ export const GLOSSARY: GlossaryTerm[] = [
   { term: 'knee', category: 'Member', definition: 'The braced joint / knee brace at the rafter-to-post corner of a portal frame.' },
   { term: 'apex', category: 'Member', definition: 'The highest POINT of the roof.' },
   { term: 'ridge', category: 'Member', definition: 'The LINE that runs along the apex (ridge line / ridge beam).' },
+  // Roof framing — roof-type-specific where noted
+  { term: 'hip rafter', category: 'Member', roofTypes: ['hip', 'pyramid', 'dutch-gable'],
+    definition: 'Rafter running up the external corner (hip) of the roof.' },
+  { term: 'jack rafter', category: 'Member', roofTypes: ['hip', 'pyramid', 'dutch-gable'],
+    definition: 'Short rafter from the eave to a hip or valley.' },
+  { term: 'valley', category: 'Member', roofTypes: ['hip', 'dutch-gable'],
+    definition: 'Internal angle where two roof planes meet (collects water).' },
+  { term: 'king post', category: 'Member', roofTypes: ['pyramid', 'hip'],
+    definition: 'Central vertical post the hip rafters meet at the apex.' },
+  { term: 'barge', category: 'Member', roofTypes: ['gable', 'dutch-gable'], aliases: ['barge board'],
+    definition: 'Trim board along the sloping gable edge of the roof.' },
+  { term: 'gable end', category: 'Member', roofTypes: ['gable', 'dutch-gable'],
+    definition: 'The triangular wall/frame at the end of a gable roof.' },
+  { term: 'gable infill', category: 'Member', roofTypes: ['gable', 'dutch-gable'],
+    definition: 'Cladding/framing filling the gable-end triangle.' },
+  { term: 'batten', category: 'Member', aliases: ['top hat', 'roof batten'],
+    definition: 'Member over the rafters/purlins that sheeting or slats fix to.' },
+  { term: 'flyover beam', category: 'Member', roofTypes: ['flyover'],
+    definition: 'The beam carrying a flyover roof clear over the existing eave.' },
+  { term: 'cantilever', category: 'Member',
+    definition: 'A member projecting beyond its support (e.g. a flyover or overhang).' },
+  { term: 'footing', category: 'Member', aliases: ['pad footing', 'concrete footing'],
+    definition: 'Concrete foundation a post bears on.' },
+  { term: 'slat', category: 'Member', aliases: ['louvre', 'baton infill'],
+    definition: 'Spaced top member giving shade on an open pergola roof (fixed or adjustable louvre).' },
 
   // Set-out heights (mm above FFL = finished floor level)
   { term: 'finished floor level', category: 'Set-out height', aliases: ['FFL'],
@@ -99,6 +153,10 @@ export const GLOSSARY: GlossaryTerm[] = [
     definition: 'Height of the apex / ridge line (highest point).' },
   { term: 'existing-gutter overhang', category: 'Set-out height', field: 'existingGutterOverhangMm', unit: 'mm',
     definition: 'How far the EXISTING dwelling gutter overhangs its wall face (sets the clearance to the new structure).' },
+  { term: 'high eave', category: 'Set-out height', roofTypes: ['skillion', 'flyover'], unit: 'mm',
+    definition: 'The raised (high) eave of a skillion / flyover roof.' },
+  { term: 'low eave', category: 'Set-out height', roofTypes: ['skillion'], unit: 'mm',
+    definition: 'The lower eave a skillion roof falls to (gutter side).' },
 
   // Wall build-up (the existing dwelling)
   { term: 'brick veneer', category: 'Wall build-up', field: 'brickThickness', unit: 'mm',
@@ -115,6 +173,8 @@ export const GLOSSARY: GlossaryTerm[] = [
     definition: 'Square-hollow-section bracket holding the structure off the wall.' },
   { term: 'lag screw', category: 'Wall build-up', field: 'lagScrewSize',
     definition: 'Coach/lag screw fixing the structure or ledger to the wall.' },
+  { term: 'parapet', category: 'Wall build-up', roofTypes: ['flat'],
+    definition: 'Low wall extending above a flat roof line.' },
 
   // Connection details (the detail blocks — DRF-00x)
   { term: 'socket joint', category: 'Connection', field: 'DRF-007', definition: 'Stub-in-rafter socket connection.' },
@@ -139,6 +199,18 @@ export const GLOSSARY: GlossaryTerm[] = [
   { term: 'ridge flashing', category: 'Roof / cladding', definition: 'Capping over the apex where roof sheets meet.' },
   { term: 'eave flashing', category: 'Roof / cladding', definition: 'Flashing at the eave/gutter line.' },
   { term: 'overhang', category: 'Roof / cladding', definition: 'Roof projection past the supporting line.' },
+  { term: 'apron flashing', category: 'Roof / cladding', roofTypes: ['skillion', 'flyover'],
+    definition: 'Flashing turning up against the dwelling wall on the high side.' },
+  { term: 'upstand', category: 'Roof / cladding', roofTypes: ['skillion', 'flyover'],
+    definition: 'Raised steel section the high-side roof flashes up against.' },
+  { term: 'bullnose', category: 'Roof / cladding', roofTypes: ['curved'],
+    definition: 'The convex curved profile of a bullnose verandah roof.' },
+  { term: 'open roof', category: 'Roof / cladding',
+    definition: 'Pergola roof of spaced battens/slats — not sheeted.' },
+  { term: 'sheeted roof', category: 'Roof / cladding',
+    definition: 'Roof fully covered with sheeting (weatherproof).' },
+  { term: 'lattice', category: 'Roof / cladding',
+    definition: 'Cross-hatched open panel infill (shade / screen).' },
 
   // Drainage
   { term: 'downpipe', category: 'Drainage', definition: 'Vertical pipe taking gutter water to ground / stormwater.' },
@@ -165,4 +237,13 @@ export function glossaryByCategory(): Record<TermCategory, GlossaryTerm[]> {
   const out = {} as Record<TermCategory, GlossaryTerm[]>;
   for (const t of GLOSSARY) (out[t.category] ??= []).push(t);
   return out;
+}
+
+/**
+ * Terms relevant to a given roof type — the universal terms (no `roofTypes`)
+ * plus the ones tagged for that form. Drives the "terms used" design note that
+ * rides into model space with a placed pergola block.
+ */
+export function termsForRoofType(roof: RoofType): GlossaryTerm[] {
+  return GLOSSARY.filter(t => !t.roofTypes || t.roofTypes.includes(roof));
 }

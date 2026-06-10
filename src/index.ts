@@ -132,5 +132,5 @@ export type { MemberView, MemberProfileOptions } from './memberProfile.js';
 export {
   type StructureType, type RoofType, type Attachment, type FrameType, type MemberRole,
   type TermCategory, type GlossaryTerm,
-  GLOSSARY, canonicalTerm, glossaryByCategory,
+  GLOSSARY, canonicalTerm, glossaryByCategory, termsForRoofType,
 } from './terms.js';
