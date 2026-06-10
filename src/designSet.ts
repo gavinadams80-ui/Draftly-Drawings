@@ -61,6 +61,20 @@ export interface DesignResults {
   purlinSpacing?: number;
   rafterLength?: number;
   gable?: { width: number; height: number; bays: number; dropperSpacing: number };
+  // ── As-sited vertical setout (mm above FFL) ──
+  // Engineering hands these over so the wall section is set out from the real,
+  // surveyed levels rather than derived defaults. All optional — older exports
+  // omit them and the generators fall back to their internal defaults.
+  /** Engineered eave / post height — top of wall, where the rafter bears. */
+  eaveHeight?: number;
+  /** Top of gutter / eave line, as sited. */
+  gutterHeight?: number;
+  /** Bottom of fascia, as sited. */
+  fasciaHeight?: number;
+  /** Ridge / highest point, as sited. */
+  ridgeHeight?: number;
+  /** Free-text planning notes the user typed into Intelligence. */
+  siteNotes?: string;
   [k: string]: unknown;
 }
 

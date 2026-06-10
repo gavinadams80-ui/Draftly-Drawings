@@ -14,6 +14,34 @@ Consumers (Draftly-Engineering, Draftly-Drafting) pin a git tag, e.g.
 
 _Nothing yet._
 
+## [0.7.0] — 2026-06-10
+
+### Added
+- **Wall section now sets out from the as-sited heights handed over in a
+  `DesignSet`.** `generateWallSectionSVG` gains a trailing optional
+  `heights: WallSectionHeights` argument (new exported type) carrying
+  `eaveHeight`, `gutterHeight`, `fasciaHeight`, `ridgeHeight` and `siteNotes`:
+  - `eaveHeight` drives the timber/brick wall height (brick keeps its 120mm step).
+  - `fasciaHeight` (bottom) + `gutterHeight` (top) **auto-size the fascia**, and
+    the gutter profile scales with it so its top stays pinned to the eave line.
+  - `ridgeHeight` overrides the pitch-derived apex (gable ridge / skillion high
+    eave); the drawn plumb-cuts and flashing use the resulting effective pitch.
+  - `siteNotes` renders a **SITE NOTES block** on the section so the planner's
+    free-text concerns travel with the drawing instead of being lost.
+  - All fields optional — older exports omit them and the section falls back to
+    the previous derived defaults, so existing consumers are untouched.
+- **`DesignResults` documents the carried setout fields** (`eaveHeight`,
+  `gutterHeight`, `fasciaHeight`, `ridgeHeight`, `siteNotes`) as typed optional
+  members alongside its existing `[k: string]: unknown` extension point. No
+  schema/version bump — the payload is unchanged on the wire.
+- **Fixture + verification:** `fixtures/sample.designset.json` carries the new
+  fields and `scripts/verify-wall-section.mjs` parses it through
+  `parseDesignSet` and renders the section, asserting the fascia/gutter/ridge
+  land at the carried heights and the notes block appears.
+
+### Exports
+- `WallSectionHeights` (type) from `./wallSection.js`.
+
 ## [0.6.0] — 2026-06-09
 
 ### Added
@@ -96,7 +124,8 @@ _Nothing yet._
   plan, three-view member preview, gable infill) with the DOM-dependent PDF
   exporter isolated in the `@draftly/drawings/pdf` entry.
 
-[Unreleased]: https://github.com/gavinadams80-ui/Draftly-Drawings/compare/v0.6.0...HEAD
+[Unreleased]: https://github.com/gavinadams80-ui/Draftly-Drawings/compare/v0.7.0...HEAD
+[0.7.0]: https://github.com/gavinadams80-ui/Draftly-Drawings/compare/v0.6.0...v0.7.0
 [0.6.0]: https://github.com/gavinadams80-ui/Draftly-Drawings/compare/v0.5.0...v0.6.0
 [0.5.0]: https://github.com/gavinadams80-ui/Draftly-Drawings/compare/v0.4.0...v0.5.0
 [0.4.0]: https://github.com/gavinadams80-ui/Draftly-Drawings/compare/v0.3.0...v0.4.0

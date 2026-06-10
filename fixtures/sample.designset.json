@@ -1,0 +1,39 @@
+{
+  "format": "draftly-designset",
+  "schemaVersion": 1,
+  "units": "mm",
+  "generated": { "by": "Draftly-Engineering (fixture)", "at": "2026-06-10T00:00:00.000Z", "libVersion": "0.7.0" },
+  "project": {
+    "projectName": "12 Example St Patio",
+    "drawingTitle": "Section A-A",
+    "client": "A. Planner",
+    "drawnBy": "ENG"
+  },
+  "geometry": {
+    "structureType": "patio",
+    "roofType": "gable",
+    "attachment": "attached",
+    "width": 6000,
+    "depth": 4200,
+    "height": 2700,
+    "pitch": 12,
+    "portalFrameCount": 3,
+    "standoff": 75,
+    "setbacks": { "left": 900, "right": 900 }
+  },
+  "members": [
+    { "id": "rafter-1", "role": "rafter", "section": "C25019", "d": 250, "b": 76, "t": 1.9, "qty": 6 },
+    { "id": "purlin-1", "role": "purlin", "section": "TopHat 96", "d": 96, "b": 50, "t": 1.5, "qty": 10 },
+    { "id": "post-1", "role": "post", "section": "100 x 100 x 4.0 SHS", "d": 100, "b": 100, "t": 4.0, "qty": 4 }
+  ],
+  "results": {
+    "purlinSpacing": 900,
+    "rafterLength": 3100,
+    "eaveHeight": 2700,
+    "gutterHeight": 2680,
+    "fasciaHeight": 2480,
+    "ridgeHeight": 3340,
+    "siteNotes": "Council flagged overlooking concern on the southern boundary — gutter line must stay below the neighbour's 3.6m fence datum. Confirm fascia colour (Monument) with owner before fabrication. Stormwater to connect to existing pit at NW corner."
+  },
+  "status": "unchecked"
+}

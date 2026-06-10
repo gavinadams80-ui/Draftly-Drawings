@@ -10,6 +10,9 @@ dist
 *.local
 *.tsbuildinfo
 
+# Verification script output (generated SVGs)
+scripts/out
+
 # Editor / OS
 .vscode/*
 !.vscode/extensions.json

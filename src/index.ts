@@ -75,7 +75,7 @@ export {
 } from './planDrawings.js';
 
 // ── Sections + elevations ──
-export { generateWallSectionSVG } from './wallSection.js';
+export { generateWallSectionSVG, type WallSectionHeights } from './wallSection.js';
 export { generateFullElevationSVG } from './fullElevation.js';
 export { generateSideElevationSVG } from './sideElevation.js';
 
