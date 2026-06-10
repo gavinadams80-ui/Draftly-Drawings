@@ -3,6 +3,27 @@
 // Brick finishes lower than timber at the top (step detail).
 // Start simple — walls and slab only. Add details incrementally.
 
+/**
+ * As-sited vertical setout handed over from Engineering's DesignSet
+ * (`results.eaveHeight` / `gutterHeight` / `fasciaHeight` / `ridgeHeight` /
+ * `siteNotes`). All optional — when a field is absent the generator falls back
+ * to its internal default so older exports keep rendering unchanged.
+ *
+ * Heights are millimetres measured up from FFL (finished floor level).
+ */
+export interface WallSectionHeights {
+  /** Engineered eave / post height (top of wall, rafter bearing). Drives wall + brick height. */
+  eaveHeight?: number;
+  /** Top of gutter / eave line. Sets the top of the fascia + gutter run. */
+  gutterHeight?: number;
+  /** Bottom of fascia. Sets the bottom of the fascia board; fascia is auto-sized to span up to `gutterHeight`. */
+  fasciaHeight?: number;
+  /** Ridge / highest point (gable apex, or high eave for skillion). Overrides the pitch-derived apex. */
+  ridgeHeight?: number;
+  /** Free-text planning notes — surfaced as a notes block on the section. */
+  siteNotes?: string;
+}
+
 export function generateWallSectionSVG(
   spanMm = 6000,
   pitchDeg = 10,
@@ -15,6 +36,7 @@ export function generateWallSectionSVG(
   columnD         = 100,               // mm — column section depth (PF3 right side)
   isGable         = true,              // false → skillion (mono-pitch) cross-section
   rafterD         = 250,               // mm — rafter section depth (from engineering)
+  heights: WallSectionHeights = {},    // as-sited vertical setout from the DesignSet (all optional)
 ): string {
   const W = 1060, H = 600;
   const sc = 0.12; // px/mm
@@ -34,8 +56,11 @@ export function generateWallSectionSVG(
   const CW        = 30;   // cavity
   const BW        = 110;  // brick veneer width
   const SLAB_H    = 100;
-  const WALL_H    = 2500; // timber full height (FFL → top of timber)
-  const BRICK_H   = 2380; // brick stops this high from FFL (120mm lower than timber)
+  const BRICK_STEP = 120; // brick stops this far below the timber top (step detail)
+  // Timber full height (FFL → top of timber). Set out from the engineered eave
+  // height when handed over, else the original default.
+  const WALL_H    = heights.eaveHeight ?? 2500;
+  const BRICK_H   = Math.max(0, WALL_H - BRICK_STEP); // brick stops 120mm lower than timber
   const COURSE    = 76;   // brick course height
 
   // ── px ──
@@ -68,6 +93,8 @@ export function generateWallSectionSVG(
   const fflY       = slabBotY - SLAB_H * sc;
   const timberTopY = fflY - WALL_H * sc;   // top of timber frame
   const brickTopY  = fflY - BRICK_H * sc;  // top of brick (lower)
+  // Convert an as-sited height (mm above FFL) to a Y coordinate on the section.
+  const mmToY = (mm: number) => fflY - mm * sc;
 
   const r  = (n: number) => n.toFixed(1);
   const ln = (x1: number, y1: number, x2: number, y2: number, col: string, sw = 0.7, dash = '') =>
@@ -135,12 +162,19 @@ export function generateWallSectionSVG(
   // Web sits on the cavity face of the brick; flanges project into cavity toward timber.
   // Positioned 10mm below the top of the last brick course.
   const fasciaCol    = '#2196f3';
-  const fasciaH_mm   = 200;
   const fasciaD_mm   = 30;   // flange depth (projects into cavity)
-  const fasciaTopMM  = 10;   // mm below brick top
-  // Position: bottom of C sits 10mm below top brick, body extends UPWARD 200mm
-  const fBotY  = brickTopY + fasciaTopMM * sc;   // bottom edge = 10mm below top of brick
-  const fTopY  = fBotY - fasciaH_mm * sc;         // top edge = 200mm above bottom
+  const fasciaTopMM  = 10;   // mm below brick top (fallback only)
+  // Auto-size the fascia from the handed-over heights when both are present:
+  //   fasciaHeight = bottom of fascia (mm above FFL)
+  //   gutterHeight = top of gutter / eave line (mm above FFL) ≈ top of fascia.
+  // Otherwise fall back to the original derived placement (10mm below the top
+  // brick course, 200mm tall).
+  const haveFasciaHeights = heights.fasciaHeight != null && heights.gutterHeight != null;
+  const fBotY  = haveFasciaHeights ? mmToY(heights.fasciaHeight!) : brickTopY + fasciaTopMM * sc;
+  const fTopY  = haveFasciaHeights ? mmToY(heights.gutterHeight!) : fBotY - 200 * sc;
+  const fasciaH_mm = haveFasciaHeights
+    ? Math.max(1, heights.gutterHeight! - heights.fasciaHeight!)
+    : 200;                                          // fascia board height (mm)
   const fDepth = fasciaD_mm * sc;
   const fSW    = 1.5;   // stroke-width (represents 1mm steel, min visible)
 
@@ -189,13 +223,18 @@ export function generateWallSectionSVG(
   // Bottom of gutter = 110mm below fascia bottom flange (fBotY)
   // Profile: 115mm wide, 62mm left leg, 90mm right/inner leg with hook return
   const gutCol    = '#c8cce0';     // black line work
-  const gutW      = 115 * sc;      // 115mm bottom width
-  const gutLegL   = 62  * sc;      // 62mm left/outer leg
-  const gutLegR   = 90  * sc;      // 90mm right/inner leg (with hook)
+  const gutW      = 115 * sc;      // 115mm bottom width (horizontal — unscaled)
+  // Vertical gutter dims scale with the fascia so the gutter keeps its profile
+  // proportions and its top stays pinned to the fascia top (= gutterHeight).
+  // In the default 200mm fascia, gutGap(110)+gutLegR(90) = 200 lands the gutter
+  // top exactly at the fascia top, so scaling by fasciaH/200 preserves that.
+  const gutVScale = fasciaH_mm / 200;
+  const gutLegL   = 62  * sc * gutVScale; // 62mm left/outer leg
+  const gutLegR   = 90  * sc * gutVScale; // 90mm right/inner leg (with hook)
   const gutHook   = 8   * sc;      // hook return width
   const gutHookUp = 6   * sc;      // hook curl height
-  const gutGap    = 110 * sc;      // gap from fascia bottom flange to gutter bottom
-  const gutBotY   = fBotY - gutGap;  // 110mm ABOVE fascia bottom flange
+  const gutGap    = 110 * sc * gutVScale; // gap from fascia bottom flange to gutter bottom
+  const gutBotY   = fBotY - gutGap;  // ABOVE fascia bottom flange
   const gutSW     = 1.2;
 
   // ── LEFT WALL gutter ──
@@ -274,15 +313,22 @@ export function generateWallSectionSVG(
   const lBearX      = lRhsEndX;
   const rBearX      = rRhsEndX;
 
-  // Ridge
+  // Ridge — use the as-sited ridge height when handed over, else derive from pitch.
   const halfRun  = midX - lBearX;
   const ridgeX   = midX;
-  const ridgeY   = bearY - halfRun * Math.tan(pitchRad);
+  const ridgeY   = heights.ridgeHeight != null
+    ? mmToY(heights.ridgeHeight)
+    : bearY - halfRun * Math.tan(pitchRad);
+  // Effective pitch the drawn rafter actually runs at (so plumb cuts + flashing
+  // legs match the geometry even when ridgeHeight overrode the apex).
+  const effPitchRad = heights.ridgeHeight != null
+    ? Math.atan2(Math.max(0, bearY - ridgeY), halfRun)
+    : pitchRad;
 
   // (unit vectors and lengths defined below after eaveTopY)
 
   // Plumb-cut ridge top: intersection of each top-face line with x = ridgeX
-  const ridgeTopY = ridgeY - d / Math.cos(pitchRad);
+  const ridgeTopY = ridgeY - d / Math.cos(effPitchRad);
 
   const poly = (pts: [number, number][], fill: string, stroke: string, sw = 0.8) => {
     const s = pts.map(([x, y]) => `${x.toFixed(1)},${y.toFixed(1)}`).join(' ');
@@ -294,7 +340,7 @@ export function generateWallSectionSVG(
   const rafterCol  = '#2196f3';
 
   // Plumb-cut eave top: straight up from bearing point
-  const eaveTopY = bearY - d / Math.cos(pitchRad);
+  const eaveTopY = bearY - d / Math.cos(effPitchRad);
 
   // ── Unit vectors (defined here — used by insulation, purlins & cleats below) ──
   const lDxV = ridgeX - lBearX, lDyV = ridgeY - bearY;
@@ -619,7 +665,7 @@ export function generateWallSectionSVG(
   // Red, same section as standoff. Shown in side view: 50mm wide.
   const connW   = 75 * sc;        // 75mm visible width in side view
   const connL   = 230 * sc;       // 230mm length along vertical axis
-  const connTan = Math.tan(pitchRad);
+  const connTan = Math.tan(effPitchRad);
   const connBotY = brickTopY;     // aligned with bottom corner of standoff (down 75mm)
 
   // LEFT connector — 75mm wide, base at brickTopY, going UP 230mm
@@ -673,8 +719,12 @@ export function generateWallSectionSVG(
     const rBearY = rhsTopY + 75 * sc;        // same datum as the gable bearing
     const lBearX = lRhsEndX;                 // high (left) bearing
     const run    = rBearX - lBearX;
-    const riseSk = run * Math.tan(pitchRad);
-    const lBearY = rBearY - riseSk;          // raised by the full-span rise
+    // High eave is the skillion's highest point — use the as-sited ridge height
+    // when handed over, else raise by the full-span rise from the pitch.
+    const lBearY = heights.ridgeHeight != null
+      ? mmToY(heights.ridgeHeight)
+      : rBearY - run * Math.tan(pitchRad);
+    const riseSk = rBearY - lBearY;          // actual drawn rise (low − high)
 
     const len  = Math.sqrt(run * run + riseSk * riseSk);
     const ux   = run / len;                  //  cos θ  (→ toward low/right)
@@ -780,6 +830,40 @@ export function generateWallSectionSVG(
   }
 
   // (labels deferred — added after all geometry is complete)
+
+  // ── SITE NOTES block — surfaces the planner's free-text notes from the
+  // DesignSet (`results.siteNotes`) so they ride on the drawing rather than
+  // being lost in the handover. Top-left, over the empty sky area. Omitted
+  // entirely when no notes were handed over.
+  if (heights.siteNotes && heights.siteNotes.trim()) {
+    const mono = 'DM Mono,monospace';
+    const notesX = 12, notesY = 12, notesW = 250;
+    const lineH = 11, pad = 8, maxChars = 38;
+    // Simple greedy word-wrap (and honour explicit newlines in the notes).
+    const wrap = (text: string): string[] => {
+      const out: string[] = [];
+      for (const para of text.replace(/\r/g, '').split('\n')) {
+        let line = '';
+        for (const word of para.split(/\s+/).filter(Boolean)) {
+          const next = line ? `${line} ${word}` : word;
+          if (next.length > maxChars && line) { out.push(line); line = word; }
+          else line = next;
+        }
+        out.push(line);                       // keep blank lines as paragraph breaks
+      }
+      return out.length ? out : [''];
+    };
+    const lines = wrap(heights.siteNotes.trim()).slice(0, 12); // cap height
+    const headH = 16;
+    const boxH = headH + pad + lines.length * lineH + pad;
+    const esc = (s: string) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+    svg += `<rect x="${notesX}" y="${notesY}" width="${notesW}" height="${boxH.toFixed(1)}" rx="3" fill="rgba(20,22,28,0.82)" stroke="#7ab8e8" stroke-width="0.8"/>`;
+    svg += `<rect x="${notesX}" y="${notesY}" width="${notesW}" height="${headH}" rx="3" fill="rgba(122,184,232,0.18)" stroke="none"/>`;
+    svg += `<text x="${notesX + pad}" y="${notesY + 11}" font-family="${mono}" font-size="9" font-weight="700" letter-spacing="1" fill="#9fcdf0">SITE NOTES</text>`;
+    lines.forEach((ln, i) => {
+      svg += `<text x="${notesX + pad}" y="${(notesY + headH + pad + i * lineH).toFixed(1)}" font-family="${mono}" font-size="8.5" fill="#cdd6e4">${esc(ln)}</text>`;
+    });
+  }
 
   svg += `</svg>`;
   return svg;
