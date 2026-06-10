@@ -12,6 +12,8 @@
 //   • gable chord = bottom chord (synonyms — the gable-end tie member).
 //   • apex = the highest POINT; ridge = the LINE that runs along the apex.
 
+import type { SectionMaterial } from './sections.js';
+
 // ── Canonical enumerations (use these unions everywhere) ──
 export type StructureType = 'carport' | 'patio' | 'pergola' | 'verandah';
 // Roof forms to design across all materials. gable/skillion/hip are the core
@@ -27,6 +29,39 @@ export type FrameType = 'back' | 'intermediate' | 'front';
 export type MemberRole =
   | 'rafter' | 'purlin' | 'post' | 'column' | 'ledger' | 'beam'
   | 'bottomChord' | 'gableChord' | 'gableDropper' | 'brace' | 'knee';
+
+// ── Catalogue taxonomy — every catalogue block classifies by THREE dimensions ──
+//   1. Building type    (what it is)        → StructureType
+//   2. Roof design type (its roof shape)    → RoofType
+//   3. Frame material   (what it's made of) → FrameMaterial (= the section catalogue's material)
+export type BuildingType = StructureType;
+export type FrameMaterial = SectionMaterial;   // 'steel' | 'cold-formed' | 'timber' | 'aluminium'
+
+export const BUILDING_TYPE_LABEL: Record<BuildingType, string> = {
+  pergola: 'Pergola', carport: 'Carport', patio: 'Patio', verandah: 'Verandah',
+};
+export const ROOF_TYPE_LABEL: Record<RoofType, string> = {
+  gable: 'Pitched Gable', skillion: 'Skillion (Mono-pitch)', hip: 'Hip', flat: 'Flat',
+  'dutch-gable': 'Dutch Gable', pyramid: 'Pyramid', curved: 'Curved (Bullnose)', flyover: 'Flyover',
+};
+export const FRAME_MATERIAL_LABEL: Record<FrameMaterial, string> = {
+  'cold-formed': 'Metal — Light',     // light-gauge / cold-formed steel (AS/NZS 4600)
+  steel: 'Metal — Structural',        // hot-rolled structural steel (AS 4100)
+  timber: 'Wood',                     // timber (AS 1720)
+  aluminium: 'Aluminium',
+};
+
+/** The classification key for a catalogue block / design idea. */
+export interface CatalogueClass {
+  buildingType: BuildingType;
+  roofType: RoofType;
+  frameMaterial: FrameMaterial;
+}
+
+/** Human-readable taxonomy path, e.g. "Pergola › Pitched Gable › Metal — Light". */
+export function classLabel(c: CatalogueClass): string {
+  return `${BUILDING_TYPE_LABEL[c.buildingType]} › ${ROOF_TYPE_LABEL[c.roofType]} › ${FRAME_MATERIAL_LABEL[c.frameMaterial]}`;
+}
 
 export type TermCategory =
   | 'Structure form' | 'Roof form' | 'Geometry' | 'Member' | 'Set-out height'
