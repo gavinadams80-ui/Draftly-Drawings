@@ -50,9 +50,17 @@ export function generateWallSectionSVG(
   isGable         = true,              // false → skillion (mono-pitch) cross-section
   rafterD         = 250,               // mm — rafter section depth (from engineering)
   heights: WallSectionHeights = {},    // as-sited vertical setout from the DesignSet (all optional)
+  opts: { scale?: number; annotate?: boolean } = {},  // view-layer concerns (see below)
 ): string {
-  const W = 1060, H = 600;
-  const sc = 0.12; // px/mm
+  // 1:1 PRINCIPLE — geometry is real-mm; a "scale" only ever belongs to the
+  // viewing window (paperspace viewport / viewBox), never baked into coordinates.
+  //   scale:1            → true 1:1 real-mm geometry (Drafting's model imports this directly)
+  //   scale:0.12 (legacy)→ reproduces the old page-fitted output for Engineering until it migrates
+  //   annotate:false     → drop text / dimensions / hatching (those live on the sheet/layout, not the model)
+  const sc = opts.scale ?? 0.12;          // px per mm (1 ⇒ real-mm 1:1)
+  const annotate = opts.annotate ?? true; // false ⇒ clean geometry only
+  const PXBASE = sc / 0.12;               // pixel-space constants track the chosen scale
+  const W = 1060 * PXBASE, H = 600 * PXBASE;
 
 
   const brickFill   = 'rgba(190,105,50,0.45)';
@@ -133,12 +141,12 @@ export function generateWallSectionSVG(
 
   // ── CONCRETE SLAB ──
   svg += rx(lTL, fflY, rTR - lTL, SLAB_H * sc, concFill, concStroke, 0.8);
-  for (let hx = lTL; hx < rTR + 12; hx += 10) {
+  if (annotate) for (let hx = lTL; hx < rTR + 12; hx += 10) {
     const x2 = Math.min(hx + SLAB_H * sc, rTR);
     svg += ln(hx, fflY, x2, Math.min(slabBotY, fflY + (x2 - hx)), concStroke, 0.5);
   }
   svg += rx(mL - 5, slabBotY, rTR - mL + 10, 5, 'rgba(80,80,80,0.4)', 'none', 0);
-  for (let gx = mL; gx < rTR; gx += 7)
+  if (annotate) for (let gx = mL; gx < rTR; gx += 7)
     svg += ln(gx, slabBotY, gx - 8, slabBotY + 5, groundCol, 0.5);
   // CONC. SLAB label deferred
 
@@ -149,24 +157,25 @@ export function generateWallSectionSVG(
 
     // TIMBER — full height
     s += rx(tL, timberTopY, tPx, wallBot - timberTopY, timberFill, timberStroke, 0.9);
-    // Timber grain lines (horizontal)
-    for (let ty = timberTopY + 8; ty < wallBot; ty += 12)
+    // Timber grain lines (horizontal) — cosmetic hatching
+    if (annotate) for (let ty = timberTopY + 8; ty < wallBot; ty += 12)
       s += ln(tL + 1, ty, tL + tPx - 1, ty, timberStroke, 0.3);
 
     // BRICK — stops lower (brickTopY)
     const bTop = fflY - brickH * sc;
     s += rx(bL, bTop, bPx, wallBot - bTop, brickFill, brickStroke, 0.8);
-    // Brick courses
-    for (let cy = bTop; cy < wallBot; cy += coursePx)
+    // Brick courses — cosmetic hatching
+    if (annotate) for (let cy = bTop; cy < wallBot; cy += coursePx)
       s += ln(bL, cy, bL + bPx, cy, brickStroke, 0.45);
 
-    // Offset step at top — show the brick-to-timber step clearly
-    // Horizontal line at brick top
-    if (!isMirrored) {
-      // Left wall: timber left, brick right
-      s += ln(tL, bTop, bL + bPx, bTop, timberStroke, 0.6, '3,3');
-    } else {
-      s += ln(bL, bTop, bL + bPx + cPx + tPx, bTop, timberStroke, 0.6, '3,3');
+    // Offset step at top — show the brick-to-timber step clearly (cosmetic detail line)
+    if (annotate) {
+      if (!isMirrored) {
+        // Left wall: timber left, brick right
+        s += ln(tL, bTop, bL + bPx, bTop, timberStroke, 0.6, '3,3');
+      } else {
+        s += ln(bL, bTop, bL + bPx + cPx + tPx, bTop, timberStroke, 0.6, '3,3');
+      }
     }
 
     return s;
@@ -329,7 +338,10 @@ export function generateWallSectionSVG(
   // face; its gutter overhangs `existingGutterOverhangMm` back toward the new
   // structure. The gap between the existing gutter edge and the new structure's
   // outer face is the CLEARANCE (= standoff − overhang); ≤0 ⇒ clash (flagged red).
-  if (drawDwelling) {
+  // Annotation/set-out only — the existing dwelling is already represented by the
+  // brick/timber/gutter profile, so this extra grey wall + dimensions belong on
+  // the sheet layer, not the 1:1 model (avoids a duplicate dwelling).
+  if (annotate && drawDwelling) {
     const mono       = 'DM Mono,monospace';
     const dwlCol     = '#8a93a8';                 // muted grey — existing (out-of-contract) fabric
     const newFaceX   = lTL;                        // new structure's outer (attached-side) face
@@ -497,6 +509,7 @@ export function generateWallSectionSVG(
   const liT1: [number,number] = [lBearX + skyX*insThickPx, eaveTopY  + skyY*insThickPx];
   svg += poly([liB1, liB2, liT2, liT1], insFill, insStroke, 0.6);
   // Diagonal hatching — clipped to the insulation parallelogram
+  if (annotate) {
   const liPts = [liB1, liB2, liT2, liT1].map(p => p.join(',')).join(' ');
   svg += `<clipPath id="liClip"><polygon points="${liPts}"/></clipPath>`;
   svg += `<g clip-path="url(#liClip)">`;
@@ -506,6 +519,7 @@ export function generateWallSectionSVG(
     svg += ln(x1, y1, x2, y2, insStroke, 0.5);
   }
   svg += `</g>`;
+  }
 
   // ── Left roof sheet: on top of insulation, extends 40mm past eave ──
   const lSB1 = liT1;
@@ -529,6 +543,7 @@ export function generateWallSectionSVG(
   const riT1: [number,number] = [rBearX + rSkyX*insThickPx, eaveTopY  + rSkyY*insThickPx];
   svg += poly([riB1, riB2, riT2, riT1], insFill, insStroke, 0.6);
   // Diagonal hatching — clipped to right insulation parallelogram
+  if (annotate) {
   const riPts = [riB1, riB2, riT2, riT1].map(p => p.join(',')).join(' ');
   svg += `<clipPath id="riClip"><polygon points="${riPts}"/></clipPath>`;
   svg += `<g clip-path="url(#riClip)">`;
@@ -538,6 +553,7 @@ export function generateWallSectionSVG(
     svg += ln(x1, y1, x2, y2, insStroke, 0.5);
   }
   svg += `</g>`;
+  }
 
   // ── EAVE FLASHING — runs under roof sheet, down insulation end, folds to gutter ──
   // Colorbond/aluminium eave flashing protects insulation end face at the eave.
@@ -823,6 +839,7 @@ export function generateWallSectionSVG(
     const i3: Pt = [rBearX + skyX * insThickPx, rBearY + skyY * insThickPx];
     const i4: Pt = [lBearX + skyX * insThickPx, lBearY + skyY * insThickPx];
     svg += polyS([i1, i2, i3, i4], insFill, insStroke, 0.6);
+    if (annotate) {
     const insPts = [i1, i2, i3, i4].map(p => p.join(',')).join(' ');
     svg += `<clipPath id="skInsClip"><polygon points="${insPts}"/></clipPath>`;
     svg += `<g clip-path="url(#skInsClip)">`;
@@ -830,6 +847,7 @@ export function generateWallSectionSVG(
       svg += ln(lBearX + t, lBearY + skyY * insThickPx - 4, lBearX + t + insThickPx * 1.2, lBearY + 4, insStroke, 0.5);
     }
     svg += `</g>`;
+    }
 
     // ── ROOF SHEET (on top of insulation; overhangs the low eave) ──
     const shBotL: Pt = i4;
@@ -892,7 +910,8 @@ export function generateWallSectionSVG(
       svg += drawSection(cx, cy, cleatHw, cleatH, 0, cleatFill, cleatCol);     // cleat
     }
 
-    // ── Eave / slope reference labels (mono, small) ──
+    // ── Eave / slope reference labels (mono, small) — annotation only ──
+    if (annotate) {
     const mono2 = 'DM Mono,monospace';
     svg += `<text x="${lBearX.toFixed(1)}" y="${(lBearY - apronUp - 6).toFixed(1)}" text-anchor="middle" font-family="${mono2}" font-size="8" fill="${rafterCol}" font-weight="600">HIGH EAVE</text>`;
     svg += `<text x="${(rBearX + 6).toFixed(1)}" y="${(rBearY - 6).toFixed(1)}" text-anchor="start" font-family="${mono2}" font-size="8" fill="${rafterCol}" font-weight="600">LOW EAVE</text>`;
@@ -900,6 +919,7 @@ export function generateWallSectionSVG(
     const midRY = (lBearY + rBearY) / 2 - 10;
     const slopeDeg = Math.atan2(rBearY - lBearY, rBearX - lBearX) * 180 / Math.PI;
     svg += `<text x="${midRX.toFixed(1)}" y="${midRY.toFixed(1)}" text-anchor="middle" font-family="${mono2}" font-size="7.5" fill="${rafterCol}" transform="rotate(${slopeDeg.toFixed(2)},${midRX.toFixed(1)},${midRY.toFixed(1)})">SKILLION ${pitchDeg}° MONO-PITCH</text>`;
+    }
   }
 
   // (labels deferred — added after all geometry is complete)
@@ -908,7 +928,7 @@ export function generateWallSectionSVG(
   // DesignSet (`results.siteNotes`) so they ride on the drawing rather than
   // being lost in the handover. Top-left, over the empty sky area. Omitted
   // entirely when no notes were handed over.
-  if (heights.siteNotes && heights.siteNotes.trim()) {
+  if (annotate && heights.siteNotes && heights.siteNotes.trim()) {
     const mono = 'DM Mono,monospace';
     const notesX = 12, notesY = 12, notesW = 250;
     const lineH = 11, pad = 8, maxChars = 38;

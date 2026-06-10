@@ -267,7 +267,9 @@ export function generateBuildingPlanSVG(
   rightSetback: number = 0,    // m — right wall stops this far from front
   _purlinSpacing: number = 1.35, // m — from engineering calc
   northRotation: number = 0,   // degrees clockwise — 0 = north is up
+  opts: { scale?: number; annotate?: boolean } = {},  // view-layer: scale (units per mm; omit = legacy page-fit) + annotation toggle
 ): string {
+  const annotate = opts.annotate ?? true;
   const W = 700, H = 580;
   const mono = 'DM Mono,monospace';
 
@@ -297,7 +299,9 @@ export function generateBuildingPlanSVG(
   const drawH     = H - margin.top  - margin.bottom;
   const totalW    = width  + sideClear * 2;
   const totalH    = wallThick + depth; // house wall + depth (standoff absorbed within depth)
-  const sc        = Math.min(drawW / totalW, drawH / totalH) * 0.88;
+  // 1:1 PRINCIPLE — explicit scale ⇒ real-mm geometry (scale = units per mm;
+  // metres → mm is ×1000), no page-fit baked in; the viewing window applies scale.
+  const sc        = opts.scale != null ? opts.scale * 1000 : Math.min(drawW / totalW, drawH / totalH) * 0.88;
 
   const wallT = wallThick * sc;
   const so    = standoff  * sc;
@@ -373,6 +377,8 @@ export function generateBuildingPlanSVG(
   svg += `<pattern id="structHatch" patternUnits="userSpaceOnUse" width="8" height="8" patternTransform="rotate(45)"><line x1="0" y1="0" x2="0" y2="8" stroke="${structCol}" stroke-width="0.4" opacity="0.15"/></pattern>`;
   svg += `</defs>`;
 
+  // ── Title + north arrow + dimensions — annotation layer (omitted from the 1:1 model) ──
+  if (annotate) {
   // ── Title ──
   const attachLabel = attachment === 'three-side' ? '3-SIDE ATTACHED' : attachment === 'attached' ? 'ATTACHED' : 'FREESTANDING';
   svg += `<text x="${W / 2}" y="18" text-anchor="middle" font-family="${mono}" font-size="9.5" fill="${textCol}" font-weight="600">PLAN VIEW · ${isGable ? 'GABLE' : 'SKILLION'} · ${attachLabel} · ${width.toFixed(2)}m × ${depth.toFixed(2)}m · ${portalFrameCount} PORTAL FRAMES · ${(standoff * 1000).toFixed(0)}mm STANDOFF</text>`;
@@ -459,6 +465,7 @@ export function generateBuildingPlanSVG(
     svg += `<text x="${sbX + 6}" y="${(rightWallEndY + frameBotY) / 2 + 3}" font-family="${mono}" font-size="6" fill="${dimCol}">${rightSetback.toFixed(1)}m</text>`;
     svg += `<text x="${sbX + 6}" y="${(rightWallEndY + frameBotY) / 2 + 12}" font-family="${mono}" font-size="6" fill="${dimCol}">setback</text>`;
   }
+  } // end annotation layer (title/north/dimensions)
 
   // ══════════════════════════════════════════════════════════════════
   // HOUSE WALLS
@@ -642,9 +649,9 @@ export function generateBuildingPlanSVG(
   }
 
   // ══════════════════════════════════════════════════════════════════
-  // BOTTOM ANNOTATION STRIP  (between fascia and legend)
-  // Gable labels, purlin labels, connection summary — nothing overlaps
+  // BOTTOM ANNOTATION STRIP + LEGEND — annotation layer (omitted from the 1:1 model)
   // ══════════════════════════════════════════════════════════════════
+  if (annotate) {
   const strip1 = frameBotY + 16; // row 1 — gable + fascia
   const strip2 = strip1 + 16;   // row 2 — purlin labels
   const strip3 = strip2 + 13;   // row 3 — purlin spacing note
@@ -717,6 +724,7 @@ export function generateBuildingPlanSVG(
     svg += `<text x="${lx + 14}" y="${cy + 4}" font-family="${mono}" font-size="6" fill="${textCol}">${label}</text>`;
     lx += label.length * 4.2 + 20;
   }
+  } // end annotation layer (bottom strip + legend)
 
   svg += `</svg>`;
   return svg;

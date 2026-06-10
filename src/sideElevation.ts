@@ -24,7 +24,9 @@ export function generateSideElevationSVG(
   // generateWallSectionSVG, so the two views agree. Optional; when absent the
   // existing dwelling falls back to the previous (new-ridge-height) behaviour.
   heights: WallSectionHeights = {},
+  opts: { scale?: number; annotate?: boolean } = {},  // view-layer: scale (units per mm; omit = legacy page-fit) + annotation toggle
 ): string {
+  const annotate = opts.annotate ?? true;
   const VB_W = 720;
   const VB_H = 440;
   const ML = 60, MR = 70, MT = 40, MB = 70;
@@ -36,7 +38,10 @@ export function generateSideElevationSVG(
   const drawH = VB_H - MT - MB;
   const sxScale = drawW / Math.max(0.5, depthM);
   const syScale = drawH / Math.max(0.5, ridgeM * 1.1);
-  const sc = Math.min(sxScale, syScale);
+  // 1:1 PRINCIPLE — when an explicit scale is given the geometry is real-mm
+  // (scale = units per mm; metres → mm is ×1000) with NO page-fit baked in; the
+  // viewing window (viewBox/viewport) applies any scale. Omitted ⇒ legacy fit-to-page.
+  const sc = opts.scale != null ? opts.scale * 1000 : Math.min(sxScale, syScale);
 
   const groundY = VB_H - MB;
   const x0 = ML;                          // depth = 0 (attached / house end)
@@ -57,7 +62,7 @@ export function generateSideElevationSVG(
 
   // Ground line
   s += `<line x1="${ML - 20}" y1="${groundY}" x2="${VB_W - MR + 20}" y2="${groundY}" stroke="${groundCol}" stroke-width="1.6"/>`;
-  for (let gx = ML - 12; gx < VB_W - MR + 20; gx += 14) {
+  if (annotate) for (let gx = ML - 12; gx < VB_W - MR + 20; gx += 14) {
     s += `<line x1="${gx}" y1="${groundY}" x2="${gx - 7}" y2="${groundY + 8}" stroke="${groundCol}" stroke-width="0.7" opacity="0.6"/>`;
   }
 
@@ -70,8 +75,10 @@ export function generateSideElevationSVG(
     for (let hy = dTop; hy < groundY; hy += 10) {
       s += `<line x1="${x0 - hw}" y1="${hy}" x2="${x0}" y2="${hy - 8}" stroke="${lineCol}" stroke-width="0.4" opacity="0.5"/>`;
     }
-    s += `<text x="${x0 - hw / 2}" y="${dTop - 10}" font-family="${mono}" font-size="8" fill="${dimCol}" text-anchor="middle">EXISTING</text>`;
-    s += `<text x="${x0 - hw / 2}" y="${dTop - 1}" font-family="${mono}" font-size="8" fill="${dimCol}" text-anchor="middle">DWELLING</text>`;
+    if (annotate) {
+      s += `<text x="${x0 - hw / 2}" y="${dTop - 10}" font-family="${mono}" font-size="8" fill="${dimCol}" text-anchor="middle">EXISTING</text>`;
+      s += `<text x="${x0 - hw / 2}" y="${dTop - 1}" font-family="${mono}" font-size="8" fill="${dimCol}" text-anchor="middle">DWELLING</text>`;
+    }
   }
 
   // Posts along the depth
@@ -91,13 +98,14 @@ export function generateSideElevationSVG(
   if (ridgeM > eaveHeightM + 0.01) {
     const highLabel = isGable ? 'RIDGE LINE (beyond)' : 'HIGH EAVE (beyond)';
     s += `<line x1="${X(0)}" y1="${Y(ridgeM)}" x2="${X(depthM)}" y2="${Y(ridgeM)}" stroke="${steelCol}" stroke-width="1.4" stroke-dasharray="6,3"/>`;
-    s += `<text x="${X(depthM / 2)}" y="${Y(ridgeM) - 5}" font-family="${mono}" font-size="8" fill="${dimCol}" text-anchor="middle">${highLabel}</text>`;
+    if (annotate) s += `<text x="${X(depthM / 2)}" y="${Y(ridgeM) - 5}" font-family="${mono}" font-size="8" fill="${dimCol}" text-anchor="middle">${highLabel}</text>`;
     // light roof slope hints at the near rake end
     s += `<line x1="${X(0)}" y1="${Y(eaveHeightM)}" x2="${X(0)}" y2="${Y(ridgeM)}" stroke="${steelCol}" stroke-width="0.8" opacity="0.5"/>`;
     s += `<line x1="${X(depthM)}" y1="${Y(eaveHeightM)}" x2="${X(depthM)}" y2="${Y(ridgeM)}" stroke="${steelCol}" stroke-width="0.8" opacity="0.5"/>`;
   }
 
-  // ── Dimensions ──
+  // ── Dimensions + title — annotation layer (omitted from the 1:1 model) ──
+  if (annotate) {
   // Depth (bottom)
   const dimY = groundY + 34;
   s += `<line x1="${X(0)}" y1="${dimY}" x2="${X(depthM)}" y2="${dimY}" stroke="${dimCol}" stroke-width="0.7"/>`;
@@ -130,6 +138,7 @@ export function generateSideElevationSVG(
 
   // Title
   s += `<text x="${ML}" y="${MT - 14}" font-family="${mono}" font-size="10" fill="${lineCol}">SIDE ELEVATION — ${nPosts} posts @ ${(depthM / (nPosts - 1)).toFixed(2)} m c/c</text>`;
+  } // end annotation layer
 
   s += `</svg>`;
   return s;

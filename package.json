@@ -1,6 +1,6 @@
 {
   "name": "@draftly/drawings",
-  "version": "0.8.0",
+  "version": "0.9.0",
   "description": "Shared, framework-agnostic SVG drawing generators for the Draftly apps (Engineering + Drafting).",
   "type": "module",
   "license": "UNLICENSED",
@@ -32,8 +32,12 @@
     "svg2pdf.js": "^2.7.0"
   },
   "peerDependenciesMeta": {
-    "jspdf": { "optional": true },
-    "svg2pdf.js": { "optional": true }
+    "jspdf": {
+      "optional": true
+    },
+    "svg2pdf.js": {
+      "optional": true
+    }
   },
   "devDependencies": {
     "jspdf": "^4.2.1",
