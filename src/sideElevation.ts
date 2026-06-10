@@ -32,7 +32,11 @@ export function generateSideElevationSVG(
   const ML = 60, MR = 70, MT = 40, MB = 70;
 
   const rise = (isGable ? widthM / 2 : widthM) * Math.tan((pitchDeg * Math.PI) / 180);
-  const ridgeM = eaveHeightM + Math.max(0, rise);
+  // Peak height: use the as-sited ridge height when handed over (the SAME value
+  // generateWallSectionSVG sets its apex to), so the side view reaches exactly the
+  // gable section's peak and the two project across at a common height. Fall back
+  // to the pitch-derived rise for older exports.
+  const ridgeM = heights.ridgeHeight != null ? heights.ridgeHeight / 1000 : eaveHeightM + Math.max(0, rise);
 
   const drawW = VB_W - ML - MR;
   const drawH = VB_H - MT - MB;
