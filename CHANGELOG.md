@@ -28,6 +28,13 @@ _Nothing yet._
   the A-A/B-B/C-C wall sections are cut at). Both default to the legacy
   assumption (ridge ∥ depth, frames span the width) when `ridgeAxis` is absent,
   so older exports render unchanged.
+- **Building plan honours the ridge axis.** `generateBuildingPlanSVG` accepts
+  `opts.ridgeAxis` + `opts.attachedSides`. With `ridgeAxis:'width'` the interior
+  re-orients — horizontal ridge, purlins across the depth, portal frames running
+  the full depth spaced across the width, posts/connections at each end (open
+  side = the non-attached side). The legacy `'depth'` path is kept verbatim, so
+  the footprint + dwelling walls and all existing output are unchanged.
+  (Side-elevation re-orientation + skillion fall direction still to come.)
 
 ## [0.8.0] — 2026-06-10
 
