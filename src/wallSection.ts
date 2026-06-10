@@ -218,6 +218,11 @@ export function generateWallSectionSVG(
   const fDepth = fasciaD_mm * sc;
   const fSW    = 1.5;   // stroke-width (represents 1mm steel, min visible)
 
+  // ── FASCIA DATUM ── the constant, level reference the views align/project from
+  // (bottom of fascia). Emitted only in the 1:1 model so the importer can hang
+  // every view off the same line; tagged so it's excluded from drawn geometry.
+  if (!annotate) svg += `<line data-datum="fascia" x1="0" y1="${r(fBotY)}" x2="0" y2="${r(fBotY)}" stroke="none"/>`;
+
   // LEFT WALL — flange tips sit against brick inner face (lBR), web projects into span
   // Shift C right by fDepth so back flanges are at brick, web sticks out toward span
   const lWebX = lBR + fDepth;

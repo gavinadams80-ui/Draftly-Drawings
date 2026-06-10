@@ -99,6 +99,14 @@ export function generateSideElevationSVG(
 
   // Eave / fascia line (front edge of roof) and ridge line
   s += `<line x1="${X(0)}" y1="${Y(eaveHeightM)}" x2="${X(depthM)}" y2="${Y(eaveHeightM)}" stroke="${steelCol}" stroke-width="2.2"/>`;
+
+  // ── FASCIA DATUM ── bottom of fascia (constant level) for cross-view alignment —
+  // the SAME reference generateWallSectionSVG emits, so the importer hangs both
+  // elevation views off one line. Model-only; tagged out of drawn geometry.
+  if (!annotate) {
+    const fasciaY = heights.fasciaHeight != null ? Y(heights.fasciaHeight / 1000) : Y(eaveHeightM);
+    s += `<line data-datum="fascia" x1="0" y1="${fasciaY.toFixed(1)}" x2="0" y2="${fasciaY.toFixed(1)}" stroke="none"/>`;
+  }
   if (ridgeM > eaveHeightM + 0.01) {
     const highLabel = isGable ? 'RIDGE LINE (beyond)' : 'HIGH EAVE (beyond)';
     s += `<line x1="${X(0)}" y1="${Y(ridgeM)}" x2="${X(depthM)}" y2="${Y(ridgeM)}" stroke="${steelCol}" stroke-width="1.4" stroke-dasharray="6,3"/>`;
