@@ -4,6 +4,8 @@
 // ridge lines, ground line, and overall dimensions. Parametric — derived purely
 // from the project config. Output is a plain SVG string for withTitleBlock().
 
+import type { WallSectionHeights } from './wallSection.js';
+
 const mono = 'DM Mono,monospace';
 const lineCol = '#c8cce0';
 const dimCol = '#9aa0bc';
@@ -18,6 +20,10 @@ export function generateSideElevationSVG(
   isGable: boolean,
   portalCount: number,
   attachment: string,
+  // As-sited heights handed over in the DesignSet — the SAME object threaded into
+  // generateWallSectionSVG, so the two views agree. Optional; when absent the
+  // existing dwelling falls back to the previous (new-ridge-height) behaviour.
+  heights: WallSectionHeights = {},
 ): string {
   const VB_W = 720;
   const VB_H = 440;
@@ -39,6 +45,14 @@ export function generateSideElevationSVG(
 
   const attached = attachment === 'attached' || attachment === 'three-side';
 
+  // Existing dwelling is single-storey: draw it to the wall-section EAVE line
+  // (carry the same eave/fascia level generateWallSectionSVG draws the dwelling
+  // to — `gutterHeight ?? eaveHeight`, +400mm parapet allowance), NOT the NEW
+  // structure's ridge. Fall back to the old ridge-height behaviour when no
+  // as-sited heights were handed over (older exports). Heights are mm above FFL.
+  const dwellEaveMm = heights.gutterHeight ?? heights.eaveHeight;
+  const dwellTopM = dwellEaveMm != null ? (dwellEaveMm + 400) / 1000 : ridgeM;
+
   let s = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${VB_W} ${VB_H}">`;
 
   // Ground line
@@ -47,15 +61,17 @@ export function generateSideElevationSVG(
     s += `<line x1="${gx}" y1="${groundY}" x2="${gx - 7}" y2="${groundY + 8}" stroke="${groundCol}" stroke-width="0.7" opacity="0.6"/>`;
   }
 
-  // Existing dwelling at the attached (left) end
+  // Existing dwelling at the attached (left) end — drawn to the single-storey
+  // wall-section eave line (dwellTopM), so this view agrees with the section.
   if (attached) {
     const hw = 26;
-    s += `<rect x="${x0 - hw}" y="${Y(ridgeM) - 6}" width="${hw}" height="${groundY - (Y(ridgeM) - 6)}" fill="rgba(255,255,255,0.05)" stroke="${lineCol}" stroke-width="1"/>`;
-    for (let hy = Y(ridgeM); hy < groundY; hy += 10) {
+    const dTop = Y(dwellTopM);
+    s += `<rect x="${x0 - hw}" y="${dTop - 6}" width="${hw}" height="${groundY - (dTop - 6)}" fill="rgba(255,255,255,0.05)" stroke="${lineCol}" stroke-width="1"/>`;
+    for (let hy = dTop; hy < groundY; hy += 10) {
       s += `<line x1="${x0 - hw}" y1="${hy}" x2="${x0}" y2="${hy - 8}" stroke="${lineCol}" stroke-width="0.4" opacity="0.5"/>`;
     }
-    s += `<text x="${x0 - hw / 2}" y="${Y(ridgeM) - 10}" font-family="${mono}" font-size="8" fill="${dimCol}" text-anchor="middle">EXISTING</text>`;
-    s += `<text x="${x0 - hw / 2}" y="${Y(ridgeM) - 1}" font-family="${mono}" font-size="8" fill="${dimCol}" text-anchor="middle">DWELLING</text>`;
+    s += `<text x="${x0 - hw / 2}" y="${dTop - 10}" font-family="${mono}" font-size="8" fill="${dimCol}" text-anchor="middle">EXISTING</text>`;
+    s += `<text x="${x0 - hw / 2}" y="${dTop - 1}" font-family="${mono}" font-size="8" fill="${dimCol}" text-anchor="middle">DWELLING</text>`;
   }
 
   // Posts along the depth
