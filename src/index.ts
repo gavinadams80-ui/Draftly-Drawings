@@ -127,3 +127,10 @@ export {
 // ── Single editable member profile (for Drafting blocks) ──
 export { generateMemberProfile } from './memberProfile.js';
 export type { MemberView, MemberProfileOptions } from './memberProfile.js';
+
+// ── Shared terminology key (one vocabulary across Intelligence / Engineering / Drafting) ──
+export {
+  type StructureType, type RoofType, type Attachment, type FrameType, type MemberRole,
+  type TermCategory, type GlossaryTerm,
+  GLOSSARY, canonicalTerm, glossaryByCategory,
+} from './terms.js';

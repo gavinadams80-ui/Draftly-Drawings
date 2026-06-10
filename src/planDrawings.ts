@@ -21,7 +21,16 @@ export function generateRoofGeometrySVG(
   const rise       = (actualSpan / 2) * Math.tan(pitch * Math.PI / 180);
   const rafterLen  = Math.sqrt(Math.pow(actualSpan / 2, 2) + Math.pow(rise, 2));
 
-  const sc   = Math.min(drawW / actualSpan, drawH / Math.max(rise, 0.5)) * 0.82;
+  // Expected building (ridge) height = eave/wall height + ridge rise.
+  const buildingHeight = height + rise;
+
+  // ── Scale ── PITCH-INDEPENDENT: anchored to the span (and a fixed 45° reference
+  // rise), NOT to the current rise. The old `drawH / rise` term re-normalised the
+  // triangle to fill the panel, so a steeper pitch never looked any taller. Sizing
+  // the panel for a fixed reference pitch keeps the scale constant across pitches,
+  // so the drawn apex height becomes a true function of pitch — steeper visibly climbs.
+  const refRise = (actualSpan / 2) * Math.tan(45 * Math.PI / 180);
+  const sc   = Math.min(drawW / actualSpan, drawH / Math.max(refRise, 0.5)) * 0.82;
   const triW = actualSpan * sc;
   const triH = rise * sc;
 
@@ -58,6 +67,14 @@ export function generateRoofGeometrySVG(
     svg += `<text x="${apexX}" y="${apexY - 24}" text-anchor="middle" font-family="${mono}" font-size="8.5" fill="${rafterCol}" font-weight="600">RIDGE</text>`;
     // Dotted leader from label down to apex node
     svg += `<line x1="${apexX}" y1="${apexY - 19}" x2="${apexX}" y2="${apexY - 5}" stroke="${rafterCol}" stroke-width="0.6" stroke-dasharray="2,2" opacity="0.6"/>`;
+
+    // ── BUILDING HEIGHT readout (eave + rise) — top-left callout ──
+    // The headline number is the expected ridge height above ground; it changes
+    // with pitch (via rise) so Section 3 reflects pitch on both the figure and the value.
+    const bhX = margin.left - 6, bhY = margin.top - 6;
+    svg += `<text x="${bhX}" y="${bhY}" text-anchor="start" font-family="${mono}" font-size="7" fill="${dimCol}">BUILDING HEIGHT (TO RIDGE)</text>`;
+    svg += `<text x="${bhX}" y="${bhY + 15}" text-anchor="start" font-family="${mono}" font-size="13" fill="${rafterCol}" font-weight="700">${buildingHeight.toFixed(2)}m</text>`;
+    svg += `<text x="${bhX}" y="${bhY + 27}" text-anchor="start" font-family="${mono}" font-size="6.5" fill="${dimCol}">= eave ${height.toFixed(2)}m + rise ${rise.toFixed(3)}m</text>`;
 
     // ── POST markers ──
     svg += `<circle cx="${leftX}"  cy="${baseY}" r="5" fill="${frameCol}" opacity="0.9"/>`;
@@ -152,7 +169,8 @@ export function generateRoofGeometrySVG(
       `Rise:        ${rise.toFixed(3)}m`,
       `Rafter:      ${rafterLen.toFixed(3)}m`,
       `Pitch:       ${pitch}°`,
-      `Gable H:     ${height.toFixed(2)}m`,
+      `Eave H:      ${height.toFixed(2)}m`,
+      `Ridge H:     ${buildingHeight.toFixed(2)}m`,
     ];
     stats.forEach((s, i) => {
       svg += `<text x="${W - 10}" y="${margin.top + 12 + i * 14}" text-anchor="end" font-family="${mono}" font-size="8" fill="${dimCol}">${s}</text>`;
@@ -172,7 +190,11 @@ export function generateRoofGeometrySVG(
     const pitchRad     = pitch * Math.PI / 180;
     const riseSk       = actualSpan * Math.tan(pitchRad);
     const rafterLenSk  = Math.sqrt(actualSpan * actualSpan + riseSk * riseSk);
-    const scSk         = Math.min(drawW / actualSpan, drawH / Math.max(riseSk, 0.5)) * 0.82;
+    const buildingHeightSk = height + riseSk; // high-side wall = low eave + fall
+    // Pitch-independent scale (anchored to a 45° reference rise across the span),
+    // so a steeper skillion visibly climbs instead of being re-normalised to fill.
+    const refRiseSk    = actualSpan * Math.tan(45 * Math.PI / 180);
+    const scSk         = Math.min(drawW / actualSpan, drawH / Math.max(refRiseSk, 0.5)) * 0.82;
     const triWSk       = actualSpan * scSk;
     const triHSk       = riseSk * scSk;
     const leftXSk      = margin.left + (drawW - triWSk) / 2;
@@ -199,6 +221,13 @@ export function generateRoofGeometrySVG(
     // ── Eave labels ──
     svg += `<text x="${leftXSk}"  y="${topYSk - 8}" text-anchor="middle" font-family="${mono}" font-size="8.5" fill="${rafterCol}" font-weight="600">HIGH EAVE</text>`;
     svg += `<text x="${rightXSk + 4}" y="${lowYSk - 8}" text-anchor="start" font-family="${mono}" font-size="8.5" fill="${rafterCol}" font-weight="600">LOW EAVE</text>`;
+
+    // ── BUILDING HEIGHT readout (low eave + fall) — top-left callout ──
+    // Headline = expected high-side wall height; grows with pitch via the fall.
+    const bhX = margin.left - 6, bhY = margin.top - 6;
+    svg += `<text x="${bhX}" y="${bhY}" text-anchor="start" font-family="${mono}" font-size="7" fill="${dimCol}">BUILDING HEIGHT (HIGH SIDE)</text>`;
+    svg += `<text x="${bhX}" y="${bhY + 15}" text-anchor="start" font-family="${mono}" font-size="13" fill="${rafterCol}" font-weight="700">${buildingHeightSk.toFixed(2)}m</text>`;
+    svg += `<text x="${bhX}" y="${bhY + 27}" text-anchor="start" font-family="${mono}" font-size="6.5" fill="${dimCol}">= eave ${height.toFixed(2)}m + fall ${riseSk.toFixed(3)}m</text>`;
 
     // ── Rafter length label (rotated along slope) ──
     const dmX = (leftXSk + rightXSk) / 2;
@@ -267,7 +296,9 @@ export function generateBuildingPlanSVG(
   rightSetback: number = 0,    // m — right wall stops this far from front
   _purlinSpacing: number = 1.35, // m — from engineering calc
   northRotation: number = 0,   // degrees clockwise — 0 = north is up
+  opts: { scale?: number; annotate?: boolean } = {},  // view-layer: scale (units per mm; omit = legacy page-fit) + annotation toggle
 ): string {
+  const annotate = opts.annotate ?? true;
   const W = 700, H = 580;
   const mono = 'DM Mono,monospace';
 
@@ -297,7 +328,9 @@ export function generateBuildingPlanSVG(
   const drawH     = H - margin.top  - margin.bottom;
   const totalW    = width  + sideClear * 2;
   const totalH    = wallThick + depth; // house wall + depth (standoff absorbed within depth)
-  const sc        = Math.min(drawW / totalW, drawH / totalH) * 0.88;
+  // 1:1 PRINCIPLE — explicit scale ⇒ real-mm geometry (scale = units per mm;
+  // metres → mm is ×1000), no page-fit baked in; the viewing window applies scale.
+  const sc        = opts.scale != null ? opts.scale * 1000 : Math.min(drawW / totalW, drawH / totalH) * 0.88;
 
   const wallT = wallThick * sc;
   const so    = standoff  * sc;
@@ -373,6 +406,8 @@ export function generateBuildingPlanSVG(
   svg += `<pattern id="structHatch" patternUnits="userSpaceOnUse" width="8" height="8" patternTransform="rotate(45)"><line x1="0" y1="0" x2="0" y2="8" stroke="${structCol}" stroke-width="0.4" opacity="0.15"/></pattern>`;
   svg += `</defs>`;
 
+  // ── Title + north arrow + dimensions — annotation layer (omitted from the 1:1 model) ──
+  if (annotate) {
   // ── Title ──
   const attachLabel = attachment === 'three-side' ? '3-SIDE ATTACHED' : attachment === 'attached' ? 'ATTACHED' : 'FREESTANDING';
   svg += `<text x="${W / 2}" y="18" text-anchor="middle" font-family="${mono}" font-size="9.5" fill="${textCol}" font-weight="600">PLAN VIEW · ${isGable ? 'GABLE' : 'SKILLION'} · ${attachLabel} · ${width.toFixed(2)}m × ${depth.toFixed(2)}m · ${portalFrameCount} PORTAL FRAMES · ${(standoff * 1000).toFixed(0)}mm STANDOFF</text>`;
@@ -459,6 +494,7 @@ export function generateBuildingPlanSVG(
     svg += `<text x="${sbX + 6}" y="${(rightWallEndY + frameBotY) / 2 + 3}" font-family="${mono}" font-size="6" fill="${dimCol}">${rightSetback.toFixed(1)}m</text>`;
     svg += `<text x="${sbX + 6}" y="${(rightWallEndY + frameBotY) / 2 + 12}" font-family="${mono}" font-size="6" fill="${dimCol}">setback</text>`;
   }
+  } // end annotation layer (title/north/dimensions)
 
   // ══════════════════════════════════════════════════════════════════
   // HOUSE WALLS
@@ -642,9 +678,9 @@ export function generateBuildingPlanSVG(
   }
 
   // ══════════════════════════════════════════════════════════════════
-  // BOTTOM ANNOTATION STRIP  (between fascia and legend)
-  // Gable labels, purlin labels, connection summary — nothing overlaps
+  // BOTTOM ANNOTATION STRIP + LEGEND — annotation layer (omitted from the 1:1 model)
   // ══════════════════════════════════════════════════════════════════
+  if (annotate) {
   const strip1 = frameBotY + 16; // row 1 — gable + fascia
   const strip2 = strip1 + 16;   // row 2 — purlin labels
   const strip3 = strip2 + 13;   // row 3 — purlin spacing note
@@ -717,6 +753,7 @@ export function generateBuildingPlanSVG(
     svg += `<text x="${lx + 14}" y="${cy + 4}" font-family="${mono}" font-size="6" fill="${textCol}">${label}</text>`;
     lx += label.length * 4.2 + 20;
   }
+  } // end annotation layer (bottom strip + legend)
 
   svg += `</svg>`;
   return svg;
