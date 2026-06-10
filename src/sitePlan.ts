@@ -20,6 +20,23 @@ export interface SitePlanData {
   // Fallback building size (m) when no footprint is supplied:
   buildingWidth?: number;
   buildingDepth?: number;
+
+  // ── Optional extras (all graceful: omit ⇒ legacy behaviour) ──
+
+  /** Aerial/satellite underlay drawn beneath the lot, georeferenced to `bbox`.
+   *  `bbox` is [west, south, east, north] in lng/lat degrees. Supply the image
+   *  as a base64 string (raw or full data URL) or a `url`. */
+  aerial?: { imageBase64?: string; url?: string; bbox: [number, number, number, number] };
+
+  /** Ridge / roof-pitch direction across the footprint. Provide either an explicit
+   *  line (`roofLine`, lat/lng endpoints) or a compass `ridgeBearing` in degrees
+   *  (0 = north, 90 = east, clockwise) drawn through the footprint centroid. */
+  ridgeBearing?: number;
+  roofLine?: { from: LatLng; to: LatLng };
+
+  /** Which footprint sides fix to the existing dwelling — those edges are
+   *  highlighted. front = southern edge, back = north, left = west, right = east. */
+  attachmentDetail?: { sides?: { front?: boolean; back?: boolean; left?: boolean; right?: boolean } };
 }
 
 interface Pt { x: number; y: number } // local metres: x east, y north
@@ -60,6 +77,13 @@ const lineCol = '#c8cce0';
 const dimCol = '#9aa0bc';
 const bldgStroke = '#c9a84c';
 const bldgFill = 'rgba(201,168,76,0.18)';
+const ridgeCol = '#e8c060';   // ridge / roof-direction line
+const connCol = '#e8643c';    // highlighted side fixed to the dwelling
+
+// Escape a value for safe use inside an XML attribute (image href / url).
+function xmlAttr(v: string): string {
+  return v.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+}
 
 /** Returns an SVG string for the site plan, or '' if there isn't enough geometry. */
 export function generateSitePlanSVG(d: SitePlanData): string {
@@ -110,6 +134,26 @@ export function generateSitePlanSVG(d: SitePlanData): string {
 
   let s = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${VB_W} ${VB_H}">`;
 
+  // ── Aerial underlay (drawn first, beneath everything; georeferenced to bbox) ──
+  if (d.aerial && (d.aerial.imageBase64 || d.aerial.url)) {
+    const [w, sLat, e, n] = d.aerial.bbox;
+    // bbox corners → local metres → screen. Projection is linear in lat/lng and
+    // north is up, so the image maps to an axis-aligned rect (NW = west/north).
+    const nw = proj.toM({ lat: n, lng: w });
+    const se = proj.toM({ lat: sLat, lng: e });
+    const xL = sx(nw.x), xR = sx(se.x);
+    const yT = sy(nw.y), yB = sy(se.y);
+    const iw = xR - xL, ih = yB - yT;
+    if (iw > 0 && ih > 0) {
+      const raw = d.aerial.imageBase64
+        ? (d.aerial.imageBase64.startsWith('data:') ? d.aerial.imageBase64 : `data:image/png;base64,${d.aerial.imageBase64}`)
+        : (d.aerial.url as string);
+      // Clip the underlay to the viewBox so an oversized bbox can't bleed past the sheet.
+      s += `<clipPath id="sheetClip"><rect x="0" y="0" width="${VB_W}" height="${VB_H}"/></clipPath>`;
+      s += `<image href="${xmlAttr(raw)}" x="${xL.toFixed(1)}" y="${yT.toFixed(1)}" width="${iw.toFixed(1)}" height="${ih.toFixed(1)}" preserveAspectRatio="none" opacity="0.85" clip-path="url(#sheetClip)"/>`;
+    }
+  }
+
   // Lot boundary
   s += `<polygon points="${poly(lot)}" fill="rgba(255,255,255,0.03)" stroke="${lineCol}" stroke-width="1.4"/>`;
 
@@ -129,8 +173,53 @@ export function generateSitePlanSVG(d: SitePlanData): string {
   // Building footprint
   if (bldg) {
     s += `<polygon points="${poly(bldg)}" fill="${bldgFill}" stroke="${bldgStroke}" stroke-width="1.6"/>`;
-    const cx = bldg.reduce((t, p) => t + sx(p.x), 0) / bldg.length;
-    const cy = bldg.reduce((t, p) => t + sy(p.y), 0) / bldg.length;
+
+    // Footprint centroid (metres + screen)
+    const cM = {
+      x: bldg.reduce((t, p) => t + p.x, 0) / bldg.length,
+      y: bldg.reduce((t, p) => t + p.y, 0) / bldg.length,
+    };
+    const cx = sx(cM.x);
+    const cy = sy(cM.y);
+
+    // ── Connection sides — highlight footprint edges fixed to the dwelling ──
+    const sides = d.attachmentDetail?.sides;
+    if (sides && (sides.front || sides.back || sides.left || sides.right)) {
+      for (let i = 0; i < bldg.length; i++) {
+        const a = bldg[i];
+        const b = bldg[(i + 1) % bldg.length];
+        const mid = { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 };
+        const dx = mid.x - cM.x, dy = mid.y - cM.y;
+        // Classify by outward direction: +y = north (back), -y = south (front).
+        const side = Math.abs(dx) >= Math.abs(dy) ? (dx >= 0 ? 'right' : 'left') : (dy >= 0 ? 'back' : 'front');
+        if (sides[side as 'front' | 'back' | 'left' | 'right']) {
+          s += `<line x1="${sx(a.x).toFixed(1)}" y1="${sy(a.y).toFixed(1)}" x2="${sx(b.x).toFixed(1)}" y2="${sy(b.y).toFixed(1)}" stroke="${connCol}" stroke-width="3.4" stroke-linecap="round" opacity="0.9"/>`;
+        }
+      }
+    }
+
+    // ── Ridge / roof-direction line across the footprint ──
+    let ridge: { from: Pt; to: Pt } | null = null;
+    if (d.roofLine) {
+      ridge = { from: proj.toM(d.roofLine.from), to: proj.toM(d.roofLine.to) };
+    } else if (d.ridgeBearing !== undefined) {
+      // Bearing: 0 = north, clockwise. Direction in (east=x, north=y).
+      const th = (d.ridgeBearing * Math.PI) / 180;
+      const dir = { x: Math.sin(th), y: Math.cos(th) };
+      // Extend ± half the footprint diagonal so the line spans across it.
+      const xs = bldg.map((p) => p.x), ys = bldg.map((p) => p.y);
+      const diag = Math.hypot(Math.max(...xs) - Math.min(...xs), Math.max(...ys) - Math.min(...ys));
+      const half = diag / 2;
+      ridge = {
+        from: { x: cM.x - dir.x * half, y: cM.y - dir.y * half },
+        to: { x: cM.x + dir.x * half, y: cM.y + dir.y * half },
+      };
+    }
+    if (ridge) {
+      s += `<line x1="${sx(ridge.from.x).toFixed(1)}" y1="${sy(ridge.from.y).toFixed(1)}" x2="${sx(ridge.to.x).toFixed(1)}" y2="${sy(ridge.to.y).toFixed(1)}" stroke="${ridgeCol}" stroke-width="1.8" stroke-dasharray="7,4"/>`;
+      s += `<text x="${sx(ridge.to.x).toFixed(1)}" y="${(sy(ridge.to.y) - 4).toFixed(1)}" font-family="${mono}" font-size="7" fill="${ridgeCol}" text-anchor="middle">RIDGE</text>`;
+    }
+
     s += `<text x="${cx.toFixed(1)}" y="${cy.toFixed(1)}" font-family="${mono}" font-size="9" fill="${bldgStroke}" text-anchor="middle" font-weight="700">PROPOSED</text>`;
     s += `<text x="${cx.toFixed(1)}" y="${(cy + 11).toFixed(1)}" font-family="${mono}" font-size="7.5" fill="${bldgStroke}" text-anchor="middle">STRUCTURE</text>`;
   }
@@ -161,6 +250,15 @@ export function generateSitePlanSVG(d: SitePlanData): string {
 
   if (indicative) {
     s += `<text x="12" y="${VB_H - 28}" font-family="${mono}" font-size="7.5" fill="${dimCol}" font-style="italic">Structure position indicative (from setbacks) — confirm against survey.</text>`;
+  }
+
+  // Connection legend — only when sides are highlighted
+  const sd = d.attachmentDetail?.sides;
+  if (bldg && sd && (sd.front || sd.back || sd.left || sd.right)) {
+    const which = (['front', 'back', 'left', 'right'] as const).filter((k) => sd[k]);
+    const legY = indicative ? VB_H - 42 : VB_H - 28;
+    s += `<line x1="14" y1="${legY - 3}" x2="30" y2="${legY - 3}" stroke="${connCol}" stroke-width="3.4" stroke-linecap="round"/>`;
+    s += `<text x="36" y="${legY}" font-family="${mono}" font-size="7.5" fill="${dimCol}">Fixed to dwelling — ${which.join(', ')}</text>`;
   }
 
   s += `</svg>`;
