@@ -14,6 +14,46 @@ Consumers (Draftly-Engineering, Draftly-Drafting) pin a git tag, e.g.
 
 _Nothing yet._
 
+## [0.8.0] — 2026-06-10
+
+### Added
+- **Wall section sets out the standoff + clearance from the existing dwelling
+  gutter.** `WallSectionHeights` gains optional `standoff` (`geometry.standoff`)
+  and `existingGutterOverhangMm` (`results.existingGutterOverhangMm`). When a
+  standoff is handed over, the section draws the existing dwelling to the left of
+  the new structure (the viewBox widens leftward so it isn't clipped), projects
+  its gutter overhang back toward the structure, and dimensions the **clearance**
+  (`standoff − overhang`) and the **standoff**. A non-positive clearance is
+  flagged **CLASH** in red. Both fields optional — older exports omit them and
+  the section renders exactly as before.
+- **Side elevation agrees with the wall section.** `generateSideElevationSVG`
+  gains a trailing optional `heights: WallSectionHeights` (the same object
+  threaded into `generateWallSectionSVG`). The existing dwelling at the attached
+  end is now drawn to the **single-storey wall-section eave line**
+  (`gutterHeight ?? eaveHeight`, +400mm parapet, matching the section) instead of
+  running up to the NEW structure's ridge. Falls back to the previous
+  ridge-height behaviour when no heights are handed over.
+- **New stormwater drainage sheet** — `generateDrainageSheetSVG(drainage, { siteNotes })`
+  (plus the `requiredFlowLs` helper) renders the design storm (intensity mm/hr +
+  AEP %), the total catchment, and a downpipe schedule listing each pipe's area
+  served, **required** flow (`intensity × area ÷ 3600`) and **rated** capacity.
+  Over-capacity downpipes and the system-level `anyOverCapacity` flag are called
+  out in red. Returns `''` when no drainage design is present, so callers keep
+  their previous behaviour. `results.siteNotes` is also surfaced as a planning-
+  notes footer on this sheet.
+- **`DesignResults` documents the carried drainage/clearance fields** —
+  `existingGutterOverhangMm` and `drainage` (new `DesignDrainage` /
+  `DesignDownpipe` types) join the typed optional members alongside the existing
+  `[k: string]: unknown` extension point. No schema/version bump — the payload is
+  unchanged on the wire (DesignSet schema stays v1).
+- **Fixture + verification:** `fixtures/sample.designset.json` carries
+  `geometry.standoff`, `results.existingGutterOverhangMm` and `results.drainage`;
+  `scripts/verify-wall-section.mjs` asserts the dwelling/standoff/clearance
+  set-out, the new `scripts/verify-drainage.mjs` parses the fixture and renders
+  the drainage sheet (storm, catchment, downpipe schedule, over-capacity
+  flagging), and the new `scripts/verify-side-elevation.mjs` asserts the existing
+  dwelling now sits at the wall-section eave line, below the new ridge.
+
 ## [0.7.0] — 2026-06-10
 
 ### Added

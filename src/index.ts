@@ -54,6 +54,8 @@ export {
   type MemberCheck,
   type DesignGeometry,
   type DesignResults,
+  type DesignDrainage,
+  type DesignDownpipe,
   type DesignLoads,
   type DesignSchedule,
   type ScheduleLine,
@@ -85,6 +87,12 @@ export {
   type SitePlanData,
   generateSitePlanSVG,
 } from './sitePlan.js';
+
+// ── Stormwater drainage sheet ──
+export {
+  generateDrainageSheetSVG,
+  requiredFlowLs,
+} from './drainage.js';
 
 // ── Member preview + gable infill ──
 export {

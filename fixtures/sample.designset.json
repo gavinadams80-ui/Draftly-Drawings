@@ -2,7 +2,7 @@
   "format": "draftly-designset",
   "schemaVersion": 1,
   "units": "mm",
-  "generated": { "by": "Draftly-Engineering (fixture)", "at": "2026-06-10T00:00:00.000Z", "libVersion": "0.7.0" },
+  "generated": { "by": "Draftly-Engineering (fixture)", "at": "2026-06-10T00:00:00.000Z", "libVersion": "0.8.0" },
   "project": {
     "projectName": "12 Example St Patio",
     "drawingTitle": "Section A-A",
@@ -18,7 +18,7 @@
     "height": 2700,
     "pitch": 12,
     "portalFrameCount": 3,
-    "standoff": 75,
+    "standoff": 165,
     "setbacks": { "left": 900, "right": 900 }
   },
   "members": [
@@ -33,6 +33,18 @@
     "gutterHeight": 2680,
     "fasciaHeight": 2480,
     "ridgeHeight": 3340,
+    "existingGutterOverhangMm": 110,
+    "drainage": {
+      "designIntensityMmHr": 145,
+      "aepPercent": 5,
+      "totalCatchmentAreaM2": 56.4,
+      "anyOverCapacity": true,
+      "downpipes": [
+        { "label": "DP1", "capacityLs": 1.2, "servesM2": 18.0 },
+        { "label": "DP2", "capacityLs": 1.2, "servesM2": 16.4 },
+        { "label": "DP3", "capacityLs": 0.8, "servesM2": 22.0 }
+      ]
+    },
     "siteNotes": "Council flagged overlooking concern on the southern boundary — gutter line must stay below the neighbour's 3.6m fence datum. Confirm fascia colour (Monument) with owner before fabrication. Stormwater to connect to existing pit at NW corner."
   },
   "status": "unchecked"

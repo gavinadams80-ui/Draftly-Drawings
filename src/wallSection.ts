@@ -20,6 +20,19 @@ export interface WallSectionHeights {
   fasciaHeight?: number;
   /** Ridge / highest point (gable apex, or high eave for skillion). Overrides the pitch-derived apex. */
   ridgeHeight?: number;
+  /**
+   * Standoff (mm) — the gap between the new structure's attached side and the
+   * EXISTING dwelling wall (`geometry.standoff`). When present (with an
+   * existing-gutter overhang) the section draws the dwelling set-out detail and
+   * dimensions the clearance to the new structure.
+   */
+  standoff?: number;
+  /**
+   * Overhang (mm) of the EXISTING dwelling's gutter past its wall face
+   * (`results.existingGutterOverhangMm`). With `standoff`, drives the clearance
+   * dimension: clearance = standoff − existingGutterOverhangMm.
+   */
+  existingGutterOverhangMm?: number;
   /** Free-text planning notes — surfaced as a notes block on the section. */
   siteNotes?: string;
 }
@@ -103,8 +116,19 @@ export function generateWallSectionSVG(
     `<rect x="${r(x)}" y="${r(y)}" width="${r(w)}" height="${r(h)}" fill="${fill}" stroke="${stroke}" stroke-width="${sw}"/>`;
 
 
-  let svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${W} ${H}" style="width:100%;max-width:${W}px;display:block;">`;
-  svg += `<rect width="${W}" height="${H}" fill="transparent"/>`;
+  // ── EXISTING-DWELLING set-out (attached structures) ──
+  // When an as-sited standoff is handed over, the section draws the existing
+  // dwelling to the LEFT of the new structure and dimensions the clearance from
+  // the dwelling's gutter. Widen the viewBox leftward so it isn't clipped.
+  const drawDwelling = heights.standoff != null && heights.standoff > 0;
+  const dwellGapPx   = drawDwelling ? heights.standoff! * sc : 0;
+  const dwellLabelRoom = 56;            // room for the dwelling wall hatch + dimension text
+  const leftExtra    = drawDwelling ? dwellGapPx + dwellLabelRoom : 0;
+  const vbX          = -leftExtra;
+  const vbW          = W + leftExtra;
+
+  let svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="${r(vbX)} 0 ${r(vbW)} ${H}" style="width:100%;max-width:${r(vbW)}px;display:block;">`;
+  svg += `<rect x="${r(vbX)}" width="${r(vbW)}" height="${H}" fill="transparent"/>`;
   // title deferred
 
   // ── CONCRETE SLAB ──
@@ -297,6 +321,55 @@ export function generateWallSectionSVG(
   const rRhsEndX   = rWebX - RHS_PAST * sc;
   if (frameType !== 'front') {
     svg += `<rect x="${rRhsEndX.toFixed(1)}" y="${rhsTopY.toFixed(1)}" width="${(rRhsStartX - rRhsEndX).toFixed(1)}" height="${rhsH.toFixed(1)}" fill="${rhsFill}" stroke="${rhsCol}" stroke-width="${RHS_T * sc * 0.5}"/>`;
+  }
+
+  // ── EXISTING DWELLING SET-OUT + CLEARANCE ──
+  // Drawn to the LEFT of the new structure (viewBox already widened by leftExtra).
+  // The dwelling wall stands `standoff` mm out from the new structure's outer
+  // face; its gutter overhangs `existingGutterOverhangMm` back toward the new
+  // structure. The gap between the existing gutter edge and the new structure's
+  // outer face is the CLEARANCE (= standoff − overhang); ≤0 ⇒ clash (flagged red).
+  if (drawDwelling) {
+    const mono       = 'DM Mono,monospace';
+    const dwlCol     = '#8a93a8';                 // muted grey — existing (out-of-contract) fabric
+    const newFaceX   = lTL;                        // new structure's outer (attached-side) face
+    const dwellWallX = newFaceX - heights.standoff! * sc;
+    const eaveMm     = heights.gutterHeight ?? heights.eaveHeight ?? WALL_H;
+    const dwTopY     = mmToY(eaveMm + 400);        // dwelling drawn a touch taller than the new eave
+    // Dwelling wall — vertical, FFL → above eave, hatched on its exterior face.
+    svg += ln(dwellWallX, fflY, dwellWallX, dwTopY, dwlCol, 1.2);
+    for (let hy = dwTopY + 8; hy < fflY; hy += 16)
+      svg += ln(dwellWallX, hy, dwellWallX - 6, hy + 6, dwlCol, 0.5);
+    const dwMidY = (dwTopY + fflY) / 2;
+    svg += `<text x="${r(dwellWallX - 9)}" y="${r(dwMidY)}" font-family="${mono}" font-size="7.5" fill="${dwlCol}" text-anchor="middle" transform="rotate(-90 ${r(dwellWallX - 9)} ${r(dwMidY)})">EXISTING DWELLING</text>`;
+
+    // Existing gutter — soffit out from the dwelling wall toward the new
+    // structure, drawn at the new structure's gutter line, with a downturned front.
+    const gutY = fTopY;
+    if (heights.existingGutterOverhangMm != null) {
+      const ohPx     = heights.existingGutterOverhangMm * sc;
+      const gutEdgeX = dwellWallX + ohPx;
+      svg += ln(dwellWallX, gutY, gutEdgeX, gutY, dwlCol, 1.2);   // soffit / gutter base
+      svg += ln(gutEdgeX, gutY, gutEdgeX, gutY + 9, dwlCol, 1.2); // gutter front downturn
+      svg += `<text x="${r(dwellWallX + 2)}" y="${r(gutY - 4)}" font-family="${mono}" font-size="7" fill="${dwlCol}" text-anchor="start">EXIST. GUTTER</text>`;
+
+      // Clearance dimension: existing gutter edge → new structure outer face.
+      const clr   = heights.standoff! - heights.existingGutterOverhangMm;
+      const clash = clr <= 0;
+      const dCol  = clash ? '#f44336' : '#7ab8e8';
+      const dimY  = gutY - 18;
+      svg += ln(gutEdgeX, dimY, newFaceX, dimY, dCol, 0.8);
+      svg += ln(gutEdgeX, dimY - 3, gutEdgeX, dimY + 3, dCol, 0.8);
+      svg += ln(newFaceX, dimY - 3, newFaceX, dimY + 3, dCol, 0.8);
+      svg += `<text x="${r((gutEdgeX + newFaceX) / 2)}" y="${r(dimY - 3)}" font-family="${mono}" font-size="7.5" fill="${dCol}" text-anchor="middle" font-weight="700">${clash ? 'CLASH ' : 'CLR '}${Math.round(clr)}</text>`;
+    }
+
+    // Standoff dimension across the gap, below the wall.
+    const sdY = fflY - 6;
+    svg += ln(dwellWallX, sdY, newFaceX, sdY, dwlCol, 0.8);
+    svg += ln(dwellWallX, sdY - 3, dwellWallX, sdY + 3, dwlCol, 0.8);
+    svg += ln(newFaceX, sdY - 3, newFaceX, sdY + 3, dwlCol, 0.8);
+    svg += `<text x="${r((dwellWallX + newFaceX) / 2)}" y="${r(sdY - 3)}" font-family="${mono}" font-size="7" fill="${dwlCol}" text-anchor="middle">STANDOFF ${Math.round(heights.standoff!)}</text>`;
   }
 
   // ══════════════════════════════════════════════════════════════════
