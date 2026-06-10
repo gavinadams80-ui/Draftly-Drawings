@@ -74,7 +74,7 @@ export const GLOSSARY: GlossaryTerm[] = [
     definition: 'Four hips rising to a central apex point (square / near-square plan).' },
   { term: 'curved roof', category: 'Roof form', roofTypes: ['curved'], aliases: ['bullnose'],
     definition: 'Convex curved roof sheet (e.g. bullnose verandah).' },
-  { term: 'flyover roof', category: 'Roof form', roofTypes: ['flyover'], aliases: ['raised', 'flyover patio'],
+  { term: 'flyover roof', category: 'Roof form', roofTypes: ['flyover'], aliases: ['raised', 'raised patio', 'flyover patio'],
     definition: 'Roof raised on posts to pass OVER the existing dwelling eave/fascia.' },
 
   // Geometry
@@ -137,8 +137,8 @@ export const GLOSSARY: GlossaryTerm[] = [
     definition: 'A member projecting beyond its support (e.g. a flyover or overhang).' },
   { term: 'footing', category: 'Member', aliases: ['pad footing', 'concrete footing'],
     definition: 'Concrete foundation a post bears on.' },
-  { term: 'slat', category: 'Member', aliases: ['louvre', 'baton infill'],
-    definition: 'Spaced top member giving shade on an open pergola roof (fixed or adjustable louvre).' },
+  { term: 'slat', category: 'Member', aliases: ['louvre', 'louver', 'batten infill'],
+    definition: 'Spaced top member giving shade on an open pergola roof (fixed slat or adjustable louvre — both terms accepted).' },
 
   // Set-out heights (mm above FFL = finished floor level)
   { term: 'finished floor level', category: 'Set-out height', aliases: ['FFL'],
@@ -228,7 +228,10 @@ export function canonicalTerm(name: string): GlossaryTerm | undefined {
   return GLOSSARY.find(t =>
     t.term.toLowerCase() === n ||
     (t.aliases ?? []).some(a => a.toLowerCase() === n) ||
-    (t.field ?? '').toLowerCase() === n,
+    (t.field ?? '').toLowerCase() === n ||
+    // Bare RoofType value (e.g. 'gable', 'flyover') resolves to its roof-form
+    // entry — those are listed first, so the form wins over member terms.
+    (t.category === 'Roof form' && (t.roofTypes ?? []).some(rt => rt === n)),
   );
 }
 
