@@ -53,6 +53,7 @@ export {
   type DesignMember,
   type MemberCheck,
   type DesignGeometry,
+  type BuildingSide,
   type DesignResults,
   type DesignDrainage,
   type DesignDownpipe,
@@ -68,6 +69,8 @@ export {
   serializeDesignSet,
   validateDesignSet,
   parseDesignSet,
+  frameSpanAxis,
+  crossSectionSpanMm,
 } from './designSet.js';
 
 // ── Plan + roof geometry ──

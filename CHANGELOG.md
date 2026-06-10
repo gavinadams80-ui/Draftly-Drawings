@@ -14,6 +14,21 @@ Consumers (Draftly-Engineering, Draftly-Drafting) pin a git tag, e.g.
 
 _Nothing yet._
 
+## [0.11.0] — 2026-06-11
+
+### Added
+- **Ridge orientation + per-side attachment carried through the handover.**
+  `DesignGeometry` gains optional `ridgeAxis` (`'width' | 'depth'` — the
+  footprint dimension the ridge line runs parallel to) and `attachedSides`
+  (`BuildingSide[]` — which faces attach to the existing dwelling, e.g.
+  `['back','left','right']`). These are set authoritatively in Intelligence so
+  Drafting never re-guesses the orientation. New `BuildingSide` type plus two
+  pure helpers: `frameSpanAxis(geometry)` (the dimension the portal frames span =
+  perpendicular to the ridge) and `crossSectionSpanMm(geometry)` (the clear span
+  the A-A/B-B/C-C wall sections are cut at). Both default to the legacy
+  assumption (ridge ∥ depth, frames span the width) when `ridgeAxis` is absent,
+  so older exports render unchanged.
+
 ## [0.8.0] — 2026-06-10
 
 ### Added
