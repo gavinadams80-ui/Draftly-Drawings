@@ -56,6 +56,29 @@ export interface DesignGeometry {
   cladding?: string;
 }
 
+/** One downpipe in the stormwater design — its rated capacity and the area it drains. */
+export interface DesignDownpipe {
+  /** Display label, e.g. 'DP1'. */
+  label: string;
+  /** Rated capacity in litres/second for the design storm. */
+  capacityLs: number;
+  /** Roof catchment area this downpipe serves (m²). */
+  servesM2: number;
+}
+
+/** Stormwater drainage design carried from Intelligence for the drainage sheet. */
+export interface DesignDrainage {
+  /** Design rainfall intensity (mm/hr) for the chosen storm. */
+  designIntensityMmHr: number;
+  /** Annual Exceedance Probability of the design storm (percent), e.g. 5 for 5% AEP. */
+  aepPercent: number;
+  /** Total roof catchment area drained (m²). */
+  totalCatchmentAreaM2: number;
+  /** True if any downpipe (or the system) is over its rated capacity — render a warning. */
+  anyOverCapacity: boolean;
+  downpipes: DesignDownpipe[];
+}
+
 /** Computed values the drawings annotate (optional, free-form-ish). */
 export interface DesignResults {
   purlinSpacing?: number;
@@ -73,6 +96,10 @@ export interface DesignResults {
   fasciaHeight?: number;
   /** Ridge / highest point, as sited. */
   ridgeHeight?: number;
+  /** Overhang of the EXISTING dwelling's gutter (mm) — sets the wall-section clearance. */
+  existingGutterOverhangMm?: number;
+  /** Stormwater drainage design — drives the drainage sheet. */
+  drainage?: DesignDrainage;
   /** Free-text planning notes the user typed into Intelligence. */
   siteNotes?: string;
   [k: string]: unknown;

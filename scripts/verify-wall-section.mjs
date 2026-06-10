@@ -28,12 +28,15 @@ const args = [
 
 // Baseline: no heights handed over (older export) — must still render.
 const baseline = generateWallSectionSVG(...args);
-// With the as-sited heights threaded from results.
+// With the as-sited heights threaded from results + the standoff/clearance
+// set-out from geometry.standoff and results.existingGutterOverhangMm.
 const sited = generateWallSectionSVG(...args, {
   eaveHeight: r.eaveHeight,
   gutterHeight: r.gutterHeight,
   fasciaHeight: r.fasciaHeight,
   ridgeHeight: r.ridgeHeight,
+  standoff: g.standoff,
+  existingGutterOverhangMm: r.existingGutterOverhangMm,
   siteNotes: r.siteNotes,
 });
 
@@ -55,6 +58,12 @@ const checks = [
   ['site notes block present', sited.includes('SITE NOTES')],
   ['site notes text present', sited.includes('Council flagged')],
   ['baseline has no site notes', !baseline.includes('SITE NOTES')],
+  ['existing dwelling drawn', sited.includes('EXISTING DWELLING')],
+  ['existing gutter drawn', sited.includes('EXIST. GUTTER')],
+  [`standoff dimensioned (STANDOFF ${g.standoff})`, sited.includes(`STANDOFF ${g.standoff}`)],
+  [`clearance dimensioned (CLR ${g.standoff - r.existingGutterOverhangMm})`,
+    sited.includes(`CLR ${g.standoff - r.existingGutterOverhangMm}`)],
+  ['baseline has no dwelling detail', !baseline.includes('EXISTING DWELLING')],
 ];
 
 let ok = true;
