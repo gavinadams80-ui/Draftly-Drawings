@@ -164,9 +164,11 @@ export function generateGableFrameModelSVG(p: GableFrameModelParams): string {
 
   // Red RHS standoff — the through-fascia wall attachment from the prior wall-section
   // detail: a 75mm steel member running from the timber wall, through the cavity / brick /
-  // fascia, into the rafter eave end. Sits at the bearing line; drawn on both walls.
+  // fascia, toward the rafter eave end. Sits on top of the brick wall; drawn on both walls.
   if (p.wall) {
-    const rhsTop = bearY - 75, rhsH2 = 75, timberIn = 90; // 90mm in from the outer timber face
+    const BRICK_STEP = 120;                                       // brick finishes below the timber top
+    const brickTopY = baseY - (p.wall.eaveHeightMm - BRICK_STEP); // top of the brick course
+    const rhsH2 = 75, rhsTop = brickTopY - rhsH2, timberIn = 90;  // bottom flush with the brick top
     const standoff = (x0: number, x1: number) => {
       const x = Math.min(x0, x1), w = Math.abs(x1 - x0);
       sec += `<rect x="${r1(x)}" y="${r1(rhsTop)}" width="${r1(w)}" height="${r1(rhsH2)}" fill="rgba(244,67,54,0.18)" stroke="#f44336" stroke-width="4"/>`;
