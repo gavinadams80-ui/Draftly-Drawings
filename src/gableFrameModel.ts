@@ -136,15 +136,17 @@ export function generateGableFrameModelSVG(p: GableFrameModelParams): string {
     for (const cx of [0, S]) {
       const inDir = cx === 0 ? 1 : -1;             // +1: column on the left, inner face toward +x
       const xi = cx === 0 ? offset : S - offset;    // inner face = rafter eave
-      const xo = xi - inDir * dC.d;                 // outer face, outboard
-      const topInner = bearY - vThick, topOuter = topInner + dC.d * tanP; // pitch-cut top
+      const fW = dP.b;
+      const xo = xi - inDir * (dC.d + fW);          // outer face moved OUT to the fascia face
+      const topInner = bearY - vThick, topOuter = topInner + (dC.d + fW) * tanP; // pitch-cut top
       sec += `<polygon points="${r1(xo)},${r1(baseY)} ${r1(xi)},${r1(baseY)} ${r1(xi)},${r1(topInner)} ${r1(xo)},${r1(topOuter)}" fill="${COL.column.fill}" stroke="${COL.column.stroke}" stroke-width="3"/>`;
       xs.push(xo, xi); ys.push(topInner, baseY);
-      // plumb fascia + gutter at the eave (column outer face)
-      const fH = Math.max(dP.d, 150), fW = dP.b, fIn = xo, fOut = xo - inDir * fW;
-      sec += `<rect x="${r1(Math.min(fIn, fOut))}" y="${r1(topOuter)}" width="${r1(fW)}" height="${r1(fH)}" fill="rgba(33,150,243,0.18)" stroke="#2196f3" stroke-width="4"/>`;
-      const gW = 100, gFront = fOut - inDir * gW, gTop = topOuter + fH - 95, gBot = topOuter + fH + 15;
-      sec += `<path d="M ${r1(fOut)} ${r1(gTop)} L ${r1(fOut)} ${r1(gBot)} L ${r1(gFront)} ${r1(gBot)} L ${r1(gFront)} ${r1(gTop - 18)}" fill="none" stroke="#c8cce0" stroke-width="4"/>`;
+      // fascia = the column outer face; gutter hung on it (position unchanged from the rafter
+      // section, so it overlays the house-attached detail).
+      const fH = Math.max(dP.d, 150);
+      sec += `<line x1="${r1(xo)}" y1="${r1(topOuter)}" x2="${r1(xo)}" y2="${r1(topOuter + fH)}" stroke="#2196f3" stroke-width="5"/>`;
+      const gW = 100, gFront = xo - inDir * gW, gTop = topOuter + fH - 95, gBot = topOuter + fH + 15;
+      sec += `<path d="M ${r1(xo)} ${r1(gTop)} L ${r1(xo)} ${r1(gBot)} L ${r1(gFront)} ${r1(gBot)} L ${r1(gFront)} ${r1(gTop - 18)}" fill="none" stroke="#c8cce0" stroke-width="4"/>`;
       xs.push(gFront); ys.push(gBot);
     }
   } else if (!isGableEnd) {
@@ -179,27 +181,41 @@ export function generateGableFrameModelSVG(p: GableFrameModelParams): string {
   };
   sec += rafterQuad(offset) + rafterQuad(S - offset);
 
-  // Laser-cut connecting plates (internal sleeve) welded to the top of each column and
-  // running inside the steel sections: TOP plate (rhombus, at the roof pitch) into the
-  // rafter; BOTTOM plate (square) into the bottom chord. 150 long × (member−10) high, each
-  // with 2× 20mm oversize holes set 30mm from the outer end and the upper/lower edges.
+  // Laser-cut connecting plates (internal sleeve) welded to the top of each column, running
+  // inside the steel sections: TOP plate — a rhombus with PLUMB-cut ends, sleeved into the
+  // rafter; BOTTOM plate — square, into the bottom chord. 150 long × 75 wide, each with 2×
+  // 20mm oversize holes set 30mm from the outer end and the upper/lower edges.
   if (steelCol) {
-    const PL = 150, holeR = 10;
-    const plate = (refX: number, refY: number, angleDeg: number, ht: number, dir: number) => {
-      const x0 = dir > 0 ? refX : refX - PL;
-      const holeX = dir > 0 ? refX + PL - 30 : refX - PL + 30;
-      const inset = ht / 2 - 30;
-      return `<g transform="rotate(${r1(angleDeg)} ${r1(refX)} ${r1(refY)})">`
-        + `<rect x="${r1(x0)}" y="${r1(refY - ht / 2)}" width="${PL}" height="${r1(ht)}" fill="none" stroke="#aab0c4" stroke-width="3" stroke-dasharray="18 12"/>`
-        + `<circle cx="${r1(holeX)}" cy="${r1(refY - inset)}" r="${holeR}" fill="none" stroke="#aab0c4" stroke-width="2"/>`
-        + `<circle cx="${r1(holeX)}" cy="${r1(refY + inset)}" r="${holeR}" fill="none" stroke="#aab0c4" stroke-width="2"/>`
-        + `</g>`;
+    const cosPitch = Math.cos(pitch);
+    const rTopY = (x: number) => {                 // rafter TOP face at span position x
+      const dist = x <= half ? (half - x) : (x - half);
+      return ridgeTopY + (Math.min(dist, run) / run) * (bearY - vThick - ridgeTopY);
+    };
+    const PL = 150, PH = 75;
+    // Top plate — rhombus with vertical (plumb) end edges, top/bottom along the rafter pitch.
+    const topPlate = (xi: number, dir: number) => {
+      const mv = Math.max(6, (vThick - PH) / 2);
+      const x2 = xi + dir * PL * cosPitch;         // outer end along the rafter (toward ridge)
+      const tA = rTopY(xi) + mv, tB = rTopY(x2) + mv;
+      const pts: [number, number][] = [[xi, tA], [x2, tB], [x2, tB + PH], [xi, tA + PH]];
+      let s = `<polygon points="${pts.map((c) => `${r1(c[0])},${r1(c[1])}`).join(' ')}" fill="none" stroke="#aab0c4" stroke-width="3" stroke-dasharray="18 12"/>`;
+      const hx = x2 - dir * 30, hy = rTopY(hx) + mv;
+      s += `<circle cx="${r1(hx)}" cy="${r1(hy + 30)}" r="10" fill="none" stroke="#aab0c4" stroke-width="2"/>`;
+      s += `<circle cx="${r1(hx)}" cy="${r1(hy + PH - 30)}" r="10" fill="none" stroke="#aab0c4" stroke-width="2"/>`;
+      return s;
+    };
+    // Bottom plate — square, sleeved into the bottom chord.
+    const sqPlate = (xi: number, refY: number, dir: number) => {
+      const x0 = dir > 0 ? xi : xi - PL, hx = dir > 0 ? xi + PL - 30 : xi - PL + 30, inset = PH / 2 - 30;
+      return `<rect x="${r1(x0)}" y="${r1(refY - PH / 2)}" width="${PL}" height="${PH}" fill="none" stroke="#aab0c4" stroke-width="3" stroke-dasharray="18 12"/>`
+        + `<circle cx="${r1(hx)}" cy="${r1(refY - inset)}" r="10" fill="none" stroke="#aab0c4" stroke-width="2"/>`
+        + `<circle cx="${r1(hx)}" cy="${r1(refY + inset)}" r="10" fill="none" stroke="#aab0c4" stroke-width="2"/>`;
     };
     for (const cx of [0, S]) {
       const inDir = cx === 0 ? 1 : -1;
       const xi = cx === 0 ? offset : S - offset;
-      sec += plate(xi, bearY - vThick / 2, -inDir * p.pitchDeg, Math.max(20, dR.d - 10), inDir); // top → rafter
-      if (isGableEnd) sec += plate(xi, bearY + dCh.d / 2, 0, Math.max(20, dCh.d - 10), inDir);   // bottom → chord
+      sec += topPlate(xi, inDir);                                    // top → rafter
+      if (isGableEnd) sec += sqPlate(xi, bearY + dCh.d / 2, inDir);  // bottom → chord
     }
   }
 
