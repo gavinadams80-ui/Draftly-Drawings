@@ -12,7 +12,24 @@ Consumers (Draftly-Engineering, Draftly-Drafting) pin a git tag, e.g.
 
 ## [Unreleased]
 
-_Nothing yet._
+### Added
+- **`DraftlyProject` — the one envelope the whole product passes around** (`src/project.ts`).
+  The customer sees ONE project moving through five plain steps, never four apps. Composes the
+  existing contracts (`DesignSet`, `terms.ts` vocabulary, `TitleBlockData`) and adds what was
+  missing: `Sourced<T>` provenance on planning facts (the gov-only / omit-don't-guess rule,
+  typed) and an append-only `ledger` audit trail (who decided what, when, against which rule
+  version). Helpers: `createProject`, `recordStep`, `isDraftlyProject`. Doc:
+  [`docs/PROJECT-CONTRACT.md`](./docs/PROJECT-CONTRACT.md).
+- **Portal frames + connection variants — the per-frame dropdown contract** (`src/frames.ts`).
+  `PortalFrame` (stable id, gridline `positionMm` along the ridge, per-END connection choice
+  keyed by `BuildingSide`), `ConnectionVariant` (id + monotonic version + lineage, `owner:
+  'catalogue' | 'user'`, parametric `params`, honest `verification` status — catalogue /
+  auto-checked / requires-review / engineer-approved). User edits are ABSORBED as new
+  versioned variants, never scribbled over generated views. Helpers: `allowedKinds` (filters
+  the dropdown by `attachedSides`), `frameEndSides`, `defaultFrames` (bridge from the legacy
+  `portalFrameCount`), `bumpVariant` (edit ⇒ version+1, verification reset). `BuildingContext`
+  gains `anchor` (GPS + bearing — root of the anchor chain) and `frames`. Doc:
+  [`docs/FRAMES-AND-CONNECTIONS.md`](./docs/FRAMES-AND-CONNECTIONS.md).
 
 ## [0.12.0] — 2026-06-12
 

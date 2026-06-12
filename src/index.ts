@@ -73,6 +73,48 @@ export {
   crossSectionSpanMm,
 } from './designSet.js';
 
+// ── DraftlyProject — the one envelope the whole product passes around ──
+export {
+  type DraftlyProject,
+  type DraftlyApp,
+  type AustralianState,
+  type ApprovalPathway,
+  type Provenance,
+  type Sourced,
+  type LedgerEntry,
+  type SiteContext,
+  type PlanningContext,
+  type PlanningOverlay,
+  type PathwayCheck,
+  type PathwayResult,
+  type BuildingContext,
+  type BuildingAnchor,
+  type DrawingRef,
+  type SubmissionState,
+  type SubmissionDocStatus,
+  PROJECT_FORMAT,
+  PROJECT_SCHEMA_VERSION,
+  createProject,
+  recordStep,
+  isDraftlyProject,
+} from './project.js';
+
+// ── Portal frames + connection variants (the per-frame dropdown contract) ──
+export {
+  type ConnectionKind,
+  type ConnectionVariant,
+  type VariantStatus,
+  type VariantVerification,
+  type FrameEndConnection,
+  type PortalFrame,
+  ATTACHED_KINDS,
+  FREESTANDING_KINDS,
+  allowedKinds,
+  frameEndSides,
+  defaultFrames,
+  bumpVariant,
+} from './frames.js';
+
 // ── Plan + roof geometry ──
 export {
   generateRoofGeometrySVG,
