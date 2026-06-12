@@ -12,7 +12,60 @@ Consumers (Draftly-Engineering, Draftly-Drafting) pin a git tag, e.g.
 
 ## [Unreleased]
 
-_Nothing yet._
+### Added
+- **`CONNECTION_CATALOG` — the standard options behind every frame-end dropdown**
+  (`src/connectionCatalog.ts`). The connections counterpart of `SECTION_CATALOG`, seeded
+  from the lib's existing connection generators (corner-post, rafter-ledger, ledger,
+  socket-joint, fascia-penetration, post-footing; cross-bracing deliberately excluded —
+  bay-level system, not a frame-end connection). `connectionOptionsForSide()` builds the
+  dropdown for a frame end (catalogue + user variants, allowedKinds-filtered, newest
+  version per id); `searchConnections()`, `KIND_LABELS`, `KIND_GENERATORS`. Plus
+  `docs/references/` — the landing zone + evaluation template for ingesting external
+  connection libraries (licence → data-or-code → AU alignment → engineering backing gates;
+  ingest-don't-depend; no automatic green ticks).
+- **`DraftlyProject` — the one envelope the whole product passes around** (`src/project.ts`).
+  The customer sees ONE project moving through five plain steps, never four apps. Composes the
+  existing contracts (`DesignSet`, `terms.ts` vocabulary, `TitleBlockData`) and adds what was
+  missing: `Sourced<T>` provenance on planning facts (the gov-only / omit-don't-guess rule,
+  typed) and an append-only `ledger` audit trail (who decided what, when, against which rule
+  version). Helpers: `createProject`, `recordStep`, `isDraftlyProject`. Doc:
+  [`docs/PROJECT-CONTRACT.md`](./docs/PROJECT-CONTRACT.md).
+- **Portal frames + connection variants — the per-frame dropdown contract** (`src/frames.ts`).
+  `PortalFrame` (stable id, gridline `positionMm` along the ridge, per-END connection choice
+  keyed by `BuildingSide`), `ConnectionVariant` (id + monotonic version + lineage, `owner:
+  'catalogue' | 'user'`, parametric `params`, honest `verification` status — catalogue /
+  auto-checked / requires-review / engineer-approved). User edits are ABSORBED as new
+  versioned variants, never scribbled over generated views. Helpers: `allowedKinds` (filters
+  the dropdown by `attachedSides`), `frameEndSides`, `defaultFrames` (bridge from the legacy
+  `portalFrameCount`), `bumpVariant` (edit ⇒ version+1, verification reset). `BuildingContext`
+  gains `anchor` (GPS + bearing — root of the anchor chain) and `frames`. Doc:
+  [`docs/FRAMES-AND-CONNECTIONS.md`](./docs/FRAMES-AND-CONNECTIONS.md).
+
+## [0.12.0] — 2026-06-12
+
+### Added
+- **`generateGableFrameModelSVG` — the 1:1 gable-frame model.** A true-scale section built
+  from real steel members (catalogue depth, C lips / RHS box, plate on the C open face)
+  instead of stick polylines, with a roof plan (span × depth: frames + purlins) projecting
+  to the section. Frame-type aware: `'gable-end'` = tied truss (rafters + bottom-chord tie +
+  infill droppers, wide face to viewer, centred on the apex, symmetric); `'portal'` = untied
+  moment frame (rafters + columns, no tie/droppers). Purlins: ridge 75 mm off apex, eave
+  flush with the rafter end, evenly spaced under the internal-span max; section end-views
+  rotated to the rafter pitch; plan purlins segmented between frames. **Attached** variant
+  draws brick-veneer walls + a red through-fascia sleeve; **freestanding** variant draws the
+  steel column→rafter knee (column to rafter top with a pitch cut, chords cut to the inner
+  column face, 2 laser-cut sleeve plates — top rhombus with plumb-cut ends + bottom square,
+  150×75 mm, 2× 20 mm holes) and a plumb eave fascia + gutter. Supersedes
+  `generateWallSectionSVG` for section drawings.
+- **`generateBrickWallBlock` — reusable brick-veneer wall block** (timber 90×45 stud + cavity
+  + brick veneer + fascia C + gutter) in real mm; place one each side of a section with the
+  inner brick faces a clear span apart. Fascia/gutter heights driven by the site set-out.
+
+### Changed
+- **`generateWallSectionSVG` canvas auto-fits the span** (up to ~15 m): the width grows to
+  the right wall face + a dimension margin, and the viewBox extends upward for a tall apex.
+  Additive — narrow spans (≤ ~6 m, the legacy 1060 floor) are byte-for-byte unchanged. This
+  generator is now **legacy**; the gable-frame model is the section drawing going forward.
 
 ## [0.12.0] — 2026-06-12
 
