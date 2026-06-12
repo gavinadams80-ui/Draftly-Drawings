@@ -204,13 +204,14 @@ export function generateGableFrameModelSVG(p: GableFrameModelParams): string {
     const dist = x <= half ? (half - x) : (x - half);
     return ridgeTopY + (Math.min(dist, run) / run) * (bearY - vThick - ridgeTopY);
   };
-  // Section end-view of each purlin — a dotted rectangle (purlin section) with its TOP
-  // aligned to the rafter top face, spaced along the rafter.
+  // Section end-view of each purlin — a dotted rectangle (purlin section) rotated to the
+  // rafter pitch so its top face lies flush along the rafter top, spaced along the rafter.
   const pW = dP.b, pH = dP.d;
   for (const x of purlinXs) {
     const ty = rafterTopY(x);
-    sec += `<rect x="${r1(x - pW / 2)}" y="${r1(ty)}" width="${r1(pW)}" height="${r1(pH)}" fill="${COL.purlin.fill}" stroke="${COL.purlin.stroke}" stroke-width="3" stroke-dasharray="22 16"/>`;
-    ys.push(ty, ty + pH);
+    const ang = x <= half ? -p.pitchDeg : p.pitchDeg; // left slope rises right; right slope mirror
+    sec += `<g transform="rotate(${r1(ang)} ${r1(x)} ${r1(ty)})"><rect x="${r1(x - pW / 2)}" y="${r1(ty)}" width="${r1(pW)}" height="${r1(pH)}" fill="${COL.purlin.fill}" stroke="${COL.purlin.stroke}" stroke-width="3" stroke-dasharray="22 16"/></g>`;
+    ys.push(ty - pW, ty + pH + pW);
   }
 
   // Ground line
@@ -222,23 +223,27 @@ export function generateGableFrameModelSVG(p: GableFrameModelParams): string {
   // centre/edges. Span (x) is shared with the section, so eaves/ridge/purlins project.
   const D = p.depthMm;
   const nF = Math.max(2, p.nFrames);
+  const bandW = Math.max(dR.b, 60);       // rafter-band width drawn for each frame in plan
   const planGap = Math.max(800, H * 0.35);
   const planBot = apexY - planGap;       // plan sits above the section apex
   const planTop = planBot - D;
+  const frameY = (i: number) => planTop + (i / (nF - 1)) * D;
   let plan = '';
   // roof extent
   plan += `<rect x="0" y="${r1(planTop)}" width="${r1(S)}" height="${r1(D)}" fill="rgba(120,130,160,0.05)" stroke="#6b7090" stroke-width="2"/>`;
-  // purlin lines (along the depth) at the shared span positions (ridge 75mm off the apex,
-  // eave flush with the rafter end) so the plan and the section end-views project.
+  // purlins run along the depth BETWEEN the frames — segmented at each rafter band so they
+  // read as purlins spanning the bays with no overlap onto the rafters in plan.
   for (const x of purlinXs) {
-    plan += `<rect x="${r1(x - dP.b / 2)}" y="${r1(planTop)}" width="${r1(dP.b)}" height="${r1(D)}" fill="${COL.dropper.fill}" stroke="${COL.dropper.stroke}" stroke-width="1.5" opacity="0.75"/>`;
+    for (let i = 0; i < nF - 1; i++) {
+      const y1 = frameY(i) + bandW / 2, y2 = frameY(i + 1) - bandW / 2;
+      if (y2 > y1) plan += `<rect x="${r1(x - dP.b / 2)}" y="${r1(y1)}" width="${r1(dP.b)}" height="${r1(y2 - y1)}" fill="${COL.purlin.fill}" stroke="${COL.purlin.stroke}" stroke-width="1.5"/>`;
+    }
   }
   // frames (rafter bands) across the span at each depth station; highlight the cut frame
   const cutIdx = p.cutFrameIndex ?? 0;
   for (let i = 0; i < nF; i++) {
-    const y = planTop + (i / (nF - 1)) * D;
+    const y = frameY(i);
     const isCut = i === cutIdx;
-    const bandW = Math.max(dR.b, 60);
     plan += `<rect x="0" y="${r1(y - bandW / 2)}" width="${r1(S)}" height="${r1(bandW)}" fill="${isCut ? 'rgba(224,86,78,0.18)' : COL.rafter.fill}" stroke="${isCut ? COL.plate : COL.rafter.stroke}" stroke-width="${isCut ? 5 : 3}"/>`;
   }
   // cut line + label for this section through the highlighted frame
