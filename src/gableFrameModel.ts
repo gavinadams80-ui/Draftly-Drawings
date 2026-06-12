@@ -33,6 +33,7 @@ export interface GableFrameModelParams {
   purlin?: Section;        // purlin (for the roof-plan line width)
   nBays?: number;          // infill bays across the span (interior droppers = nBays − 1)
   dropperSpacingMm?: number; // infill dropper spacing (centred on the apex, symmetric)
+  ridgePurlinGapMm?: number;  // gap from the apex to the first (ridge) purlin (default 75)
   rafterOffsetMm?: number; // rafter set-back from the wall/fascia to clear the gutter
   gutterWidthMm?: number;  // gutter width (Intelligence) — passed through to the wall block
   plateOnRafter?: boolean; // close the C open face with a plate
@@ -49,6 +50,7 @@ const COL = {
   column:  { stroke: '#c9a84c', fill: 'rgba(201,168,76,0.14)' },
   chord:   { stroke: '#8bc34a', fill: 'rgba(139,195,26,0.14)' },
   dropper: { stroke: '#8bc34a', fill: 'rgba(139,195,26,0.10)' },
+  purlin:  { stroke: '#6fb7d6', fill: 'rgba(111,183,214,0.10)' },
   plate:   '#e0564e',
   guide:   '#c9a84c',
   text:    '#c8cce0',
@@ -86,6 +88,7 @@ export function generateGableFrameModelSVG(p: GableFrameModelParams): string {
   const dC = parseSectionDims(p.column);
   const dCh = parseSectionDims(p.chord ?? p.rafter);
   const dD = parseSectionDims(p.dropper ?? p.rafter);
+  const dP = p.purlin ? parseSectionDims(p.purlin) : dD;
   const S = p.spanMm;
   const half = S / 2;
   const pitch = (p.pitchDeg * Math.PI) / 180;
@@ -177,6 +180,32 @@ export function generateGableFrameModelSVG(p: GableFrameModelParams): string {
       xs.push(xl, xr); ys.push(Math.min(yl, yr, ridgeUnderY), bearY);
     }
   }
+  // ── Purlin layout — along the rafter slope, from a ridge gap (75mm off the apex) at the
+  // internal-span spacing (engineering roofing profile), with the eave purlin flush with
+  // the rafter end. Shared by the section end-views and the roof plan so they project.
+  const cosP = Math.cos(pitch);
+  const slopeLen = run / cosP;
+  const ridgeGap = p.ridgePurlinGapMm ?? 75;
+  const slopeDs: number[] = [];
+  for (let s = ridgeGap; s < slopeLen - 50; s += p.purlinSpacingMm) slopeDs.push(s);
+  slopeDs.push(slopeLen);                                   // eave purlin at the rafter end
+  const purlinXs: number[] = [];
+  for (const s of slopeDs) { purlinXs.push(half - s * cosP); purlinXs.push(half + s * cosP); }
+
+  // Rafter TOP-face height at span position x.
+  const rafterTopY = (x: number) => {
+    const dist = x <= half ? (half - x) : (x - half);
+    return ridgeTopY + (Math.min(dist, run) / run) * (bearY - vThick - ridgeTopY);
+  };
+  // Section end-view of each purlin — a dotted rectangle (purlin section) sitting on the
+  // rafter top, spaced along the rafter. (Drawn sitting ON the rafter top face.)
+  const pW = dP.b, pH = dP.d;
+  for (const x of purlinXs) {
+    const ty = rafterTopY(x);
+    sec += `<rect x="${r1(x - pW / 2)}" y="${r1(ty - pH)}" width="${r1(pW)}" height="${r1(pH)}" fill="${COL.purlin.fill}" stroke="${COL.purlin.stroke}" stroke-width="3" stroke-dasharray="22 16"/>`;
+    ys.push(ty - pH);
+  }
+
   // Ground line
   sec += `<line x1="${r1(-BRICK_WALL_THICKNESS_MM - 100)}" y1="${r1(baseY)}" x2="${r1(S + BRICK_WALL_THICKNESS_MM + 100)}" y2="${r1(baseY)}" stroke="#666" stroke-width="4"/>`;
 
@@ -186,18 +215,14 @@ export function generateGableFrameModelSVG(p: GableFrameModelParams): string {
   // centre/edges. Span (x) is shared with the section, so eaves/ridge/purlins project.
   const D = p.depthMm;
   const nF = Math.max(2, p.nFrames);
-  const dP = p.purlin ? parseSectionDims(p.purlin) : dD;
   const planGap = Math.max(800, H * 0.35);
   const planBot = apexY - planGap;       // plan sits above the section apex
   const planTop = planBot - D;
   let plan = '';
   // roof extent
   plan += `<rect x="0" y="${r1(planTop)}" width="${r1(S)}" height="${r1(D)}" fill="rgba(120,130,160,0.05)" stroke="#6b7090" stroke-width="2"/>`;
-  // purlin lines (along the depth): one 50mm from the apex, marching to the eave, with the
-  // eave-end purlin flush with the rafter end face (at the rafter offset).
-  const purlinXs: number[] = [];
-  for (let x = half - 50; x > offset + 1; x -= p.purlinSpacingMm) { purlinXs.push(x); purlinXs.push(S - x); }
-  purlinXs.push(offset, S - offset);
+  // purlin lines (along the depth) at the shared span positions (ridge 75mm off the apex,
+  // eave flush with the rafter end) so the plan and the section end-views project.
   for (const x of purlinXs) {
     plan += `<rect x="${r1(x - dP.b / 2)}" y="${r1(planTop)}" width="${r1(dP.b)}" height="${r1(D)}" fill="${COL.dropper.fill}" stroke="${COL.dropper.stroke}" stroke-width="1.5" opacity="0.75"/>`;
   }
