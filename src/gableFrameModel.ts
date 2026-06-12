@@ -222,8 +222,25 @@ export function generateGableFrameModelSVG(p: GableFrameModelParams): string {
   };
   // Section end-view of each purlin — a dotted rectangle (purlin section) rotated to the
   // rafter pitch so its top face lies flush along the rafter top, spaced along the rafter.
+  // FREESTANDING (not attached to a house): the eave-end purlin rotates to PLUMB and
+  // becomes the fascia, with a gutter hung on its outboard face to catch the roof run-off.
   const pW = dP.b, pH = dP.d;
+  const eaveFascia = (x: number, outDir: number) => {
+    const yT = rafterTopY(x);                 // rafter top at the eave
+    const fH = Math.max(pH, 150);             // fascia height
+    const xb = x + outDir * pW;               // outboard face
+    sec += `<rect x="${r1(Math.min(x, xb))}" y="${r1(yT)}" width="${r1(pW)}" height="${r1(fH)}" fill="rgba(33,150,243,0.18)" stroke="#2196f3" stroke-width="4"/>`;
+    // gutter on the outboard face near the bottom (U-profile with a hook)
+    const gW = 110, gBack = xb, gFront = xb + outDir * gW, gTop = yT + fH - 95, gBot = yT + fH + 15;
+    sec += `<path d="M ${r1(gBack)} ${r1(gTop)} L ${r1(gBack)} ${r1(gBot)} L ${r1(gFront)} ${r1(gBot)} L ${r1(gFront)} ${r1(gTop - 18)}" fill="none" stroke="#c8cce0" stroke-width="4"/>`;
+    xs.push(Math.min(x, xb), gFront); ys.push(yT, gBot);
+  };
   for (const x of purlinXs) {
+    const isEave = Math.abs(x - offset) < 1 || Math.abs(x - (S - offset)) < 1;
+    if (isEave && !p.wall) {                  // freestanding eave → plumb fascia + gutter
+      eaveFascia(x, x <= half ? -1 : 1);
+      continue;
+    }
     const ty = rafterTopY(x);
     const ang = x <= half ? -p.pitchDeg : p.pitchDeg; // left slope rises right; right slope mirror
     sec += `<g transform="rotate(${r1(ang)} ${r1(x)} ${r1(ty)})"><rect x="${r1(x - pW / 2)}" y="${r1(ty)}" width="${r1(pW)}" height="${r1(pH)}" fill="${COL.purlin.fill}" stroke="${COL.purlin.stroke}" stroke-width="3" stroke-dasharray="22 16"/></g>`;
