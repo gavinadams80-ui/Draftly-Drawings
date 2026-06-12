@@ -265,8 +265,14 @@ export function generateGableFrameModelSVG(p: GableFrameModelParams): string {
   // roof extent
   plan += `<rect x="0" y="${r1(planTop)}" width="${r1(S)}" height="${r1(D)}" fill="rgba(120,130,160,0.05)" stroke="#6b7090" stroke-width="2"/>`;
   // purlins run along the depth BETWEEN the frames — segmented at each rafter band so they
-  // read as purlins spanning the bays with no overlap onto the rafters in plan.
+  // read as purlins spanning the bays with no overlap onto the rafters in plan. The
+  // freestanding eave purlin is the fascia, so it runs CONTINUOUSLY along the full eave.
   for (const x of purlinXs) {
+    const isEave = Math.abs(x - offset) < 1 || Math.abs(x - (S - offset)) < 1;
+    if (isEave && !p.wall) {
+      plan += `<rect x="${r1(x - dP.b / 2)}" y="${r1(planTop)}" width="${r1(dP.b)}" height="${r1(D)}" fill="rgba(33,150,243,0.18)" stroke="#2196f3" stroke-width="2"/>`;
+      continue;
+    }
     for (let i = 0; i < nF - 1; i++) {
       const y1 = frameY(i) + bandW / 2, y2 = frameY(i + 1) - bandW / 2;
       if (y2 > y1) plan += `<rect x="${r1(x - dP.b / 2)}" y="${r1(y1)}" width="${r1(dP.b)}" height="${r1(y2 - y1)}" fill="${COL.purlin.fill}" stroke="${COL.purlin.stroke}" stroke-width="1.5"/>`;
