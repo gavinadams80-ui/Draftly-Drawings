@@ -166,9 +166,15 @@ export function generateGableFrameModelSVG(p: GableFrameModelParams): string {
       if (Math.abs(x - half) > 1) dropXs.push(S - x);
     }
     for (const x of dropXs) {
-      const underY = rafterUnderY(x);
-      sec += `<rect x="${r1(x - dD.d / 2)}" y="${r1(underY)}" width="${r1(dD.d)}" height="${r1(bearY - underY)}" fill="${COL.dropper.fill}" stroke="${COL.dropper.stroke}" stroke-width="3"/>`;
-      xs.push(x - dD.d / 2, x + dD.d / 2); ys.push(underY, bearY);
+      const xl = x - dD.d / 2, xr = x + dD.d / 2;
+      const yl = rafterUnderY(xl), yr = rafterUnderY(xr);
+      // Top edge follows the rafter underside so the dropper tucks under without poking
+      // through; the king post that straddles the apex gets a peaked top to the ridge.
+      const top = (xl < half && xr > half)
+        ? `${r1(xr)},${r1(yr)} ${r1(half)},${r1(ridgeUnderY)} ${r1(xl)},${r1(yl)}`
+        : `${r1(xr)},${r1(yr)} ${r1(xl)},${r1(yl)}`;
+      sec += `<polygon points="${r1(xl)},${r1(bearY)} ${r1(xr)},${r1(bearY)} ${top}" fill="${COL.dropper.fill}" stroke="${COL.dropper.stroke}" stroke-width="3"/>`;
+      xs.push(xl, xr); ys.push(Math.min(yl, yr, ridgeUnderY), bearY);
     }
   }
   // Ground line
