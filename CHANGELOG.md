@@ -13,6 +13,16 @@ Consumers (Draftly-Engineering, Draftly-Drafting) pin a git tag, e.g.
 ## [Unreleased]
 
 ### Added
+- **`CONNECTION_CATALOG` — the standard options behind every frame-end dropdown**
+  (`src/connectionCatalog.ts`). The connections counterpart of `SECTION_CATALOG`, seeded
+  from the lib's existing connection generators (corner-post, rafter-ledger, ledger,
+  socket-joint, fascia-penetration, post-footing; cross-bracing deliberately excluded —
+  bay-level system, not a frame-end connection). `connectionOptionsForSide()` builds the
+  dropdown for a frame end (catalogue + user variants, allowedKinds-filtered, newest
+  version per id); `searchConnections()`, `KIND_LABELS`, `KIND_GENERATORS`. Plus
+  `docs/references/` — the landing zone + evaluation template for ingesting external
+  connection libraries (licence → data-or-code → AU alignment → engineering backing gates;
+  ingest-don't-depend; no automatic green ticks).
 - **`DraftlyProject` — the one envelope the whole product passes around** (`src/project.ts`).
   The customer sees ONE project moving through five plain steps, never four apps. Composes the
   existing contracts (`DesignSet`, `terms.ts` vocabulary, `TitleBlockData`) and adds what was
