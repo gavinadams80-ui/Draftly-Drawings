@@ -130,6 +130,8 @@ export {
 // ── Single editable member profile (for Drafting blocks) ──
 export { generateMemberProfile } from './memberProfile.js';
 export type { MemberView, MemberProfileOptions } from './memberProfile.js';
+export { generateGableFrameModelSVG } from './gableFrameModel.js';
+export type { GableFrameModelParams } from './gableFrameModel.js';
 
 // ── Shared terminology key (one vocabulary across Intelligence / Engineering / Drafting) ──
 export {
