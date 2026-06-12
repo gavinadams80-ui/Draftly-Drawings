@@ -101,6 +101,8 @@ export function generateGableFrameModelSVG(p: GableFrameModelParams): string {
   // begins here and must not run past it toward the wall; the bottom chord runs the full
   // span to the fascia underneath it.
   const offset = isGableEnd ? Math.max(0, p.rafterOffsetMm ?? 0) : 0;
+  const steelCol = !p.wall;                 // freestanding → steel columns + knee connection
+  const tanP = Math.tan(pitch);
   const run = Math.max(1, half - offset);
   const rafterRise = run * tan;
   const vThick = dR.d / Math.cos(pitch);   // plumb-cut (vertical) thickness of the rafter
@@ -127,20 +129,35 @@ export function generateGableFrameModelSVG(p: GableFrameModelParams): string {
     xs.push(-BRICK_WALL_THICKNESS_MM, S + BRICK_WALL_THICKNESS_MM);
     ys.push(baseY + 100);
   }
-  if (!p.wall || !isGableEnd) {
+  if (steelCol) {
+    // Freestanding: steel columns continue up to the rafter TOP face, top cut to the pitch.
+    // Inner face sits at the rafter eave (rafter + chords are cut to it). The eave purlin
+    // rotates to a plumb fascia at the OUTER face, with a gutter to catch the run-off.
+    for (const cx of [0, S]) {
+      const inDir = cx === 0 ? 1 : -1;             // +1: column on the left, inner face toward +x
+      const xi = cx === 0 ? offset : S - offset;    // inner face = rafter eave
+      const xo = xi - inDir * dC.d;                 // outer face, outboard
+      const topInner = bearY - vThick, topOuter = topInner + dC.d * tanP; // pitch-cut top
+      sec += `<polygon points="${r1(xo)},${r1(baseY)} ${r1(xi)},${r1(baseY)} ${r1(xi)},${r1(topInner)} ${r1(xo)},${r1(topOuter)}" fill="${COL.column.fill}" stroke="${COL.column.stroke}" stroke-width="3"/>`;
+      xs.push(xo, xi); ys.push(topInner, baseY);
+      // plumb fascia + gutter at the eave (column outer face)
+      const fH = Math.max(dP.d, 150), fW = dP.b, fIn = xo, fOut = xo - inDir * fW;
+      sec += `<rect x="${r1(Math.min(fIn, fOut))}" y="${r1(topOuter)}" width="${r1(fW)}" height="${r1(fH)}" fill="rgba(33,150,243,0.18)" stroke="#2196f3" stroke-width="4"/>`;
+      const gW = 100, gFront = fOut - inDir * gW, gTop = topOuter + fH - 95, gBot = topOuter + fH + 15;
+      sec += `<path d="M ${r1(fOut)} ${r1(gTop)} L ${r1(fOut)} ${r1(gBot)} L ${r1(gFront)} ${r1(gBot)} L ${r1(gFront)} ${r1(gTop - 18)}" fill="none" stroke="#c8cce0" stroke-width="4"/>`;
+      xs.push(gFront); ys.push(gBot);
+    }
+  } else if (!isGableEnd) {
+    // Portal attached to a wall: simple steel columns at the wall line.
     for (const cx of [0, S]) {
       sec += `<rect x="${r1(cx - dC.d / 2)}" y="${r1(bearY)}" width="${r1(dC.d)}" height="${r1(baseY - bearY)}" fill="${COL.column.fill}" stroke="${COL.column.stroke}" stroke-width="3"/>`;
-      if (p.plateOnColumn) {
-        const px = cx > 0 ? cx - dC.d / 2 : cx + dC.d / 2;
-        sec += `<line x1="${r1(px)}" y1="${r1(bearY)}" x2="${r1(px)}" y2="${r1(baseY)}" stroke="${COL.plate}" stroke-width="5"/>`;
-      }
       xs.push(cx - dC.d / 2, cx + dC.d / 2); ys.push(bearY, baseY);
     }
   }
   // Bottom-chord tie (gable-end only) — top at the bearing line so the rafter underside
   // sits on it. Set back from each wall to clear the fascia (20mm clearance ⇒ ~40mm from
   // the wall face), so it can't clash with the fascia.
-  const chordInset = p.chordEndInsetMm ?? 40;
+  const chordInset = steelCol ? offset : (p.chordEndInsetMm ?? 40); // cut to the inner column face
   if (isGableEnd) {
     const m = memberBand(chordInset, bearY, S - chordInset, bearY, dCh.d, COL.chord, dCh.t, false);
     sec += m.svg; track(m);
@@ -161,6 +178,30 @@ export function generateGableFrameModelSVG(p: GableFrameModelParams): string {
     return s;
   };
   sec += rafterQuad(offset) + rafterQuad(S - offset);
+
+  // Laser-cut connecting plates (internal sleeve) welded to the top of each column and
+  // running inside the steel sections: TOP plate (rhombus, at the roof pitch) into the
+  // rafter; BOTTOM plate (square) into the bottom chord. 150 long × (member−10) high, each
+  // with 2× 20mm oversize holes set 30mm from the outer end and the upper/lower edges.
+  if (steelCol) {
+    const PL = 150, holeR = 10;
+    const plate = (refX: number, refY: number, angleDeg: number, ht: number, dir: number) => {
+      const x0 = dir > 0 ? refX : refX - PL;
+      const holeX = dir > 0 ? refX + PL - 30 : refX - PL + 30;
+      const inset = ht / 2 - 30;
+      return `<g transform="rotate(${r1(angleDeg)} ${r1(refX)} ${r1(refY)})">`
+        + `<rect x="${r1(x0)}" y="${r1(refY - ht / 2)}" width="${PL}" height="${r1(ht)}" fill="none" stroke="#aab0c4" stroke-width="3" stroke-dasharray="18 12"/>`
+        + `<circle cx="${r1(holeX)}" cy="${r1(refY - inset)}" r="${holeR}" fill="none" stroke="#aab0c4" stroke-width="2"/>`
+        + `<circle cx="${r1(holeX)}" cy="${r1(refY + inset)}" r="${holeR}" fill="none" stroke="#aab0c4" stroke-width="2"/>`
+        + `</g>`;
+    };
+    for (const cx of [0, S]) {
+      const inDir = cx === 0 ? 1 : -1;
+      const xi = cx === 0 ? offset : S - offset;
+      sec += plate(xi, bearY - vThick / 2, -inDir * p.pitchDeg, Math.max(20, dR.d - 10), inDir); // top → rafter
+      if (isGableEnd) sec += plate(xi, bearY + dCh.d / 2, 0, Math.max(20, dCh.d - 10), inDir);   // bottom → chord
+    }
+  }
 
   // Red RHS standoff — the through-fascia wall attachment from the prior wall-section
   // detail: a 75mm steel member running from the timber wall, through the cavity / brick /
@@ -222,25 +263,12 @@ export function generateGableFrameModelSVG(p: GableFrameModelParams): string {
   };
   // Section end-view of each purlin — a dotted rectangle (purlin section) rotated to the
   // rafter pitch so its top face lies flush along the rafter top, spaced along the rafter.
-  // FREESTANDING (not attached to a house): the eave-end purlin rotates to PLUMB and
-  // becomes the fascia, with a gutter hung on its outboard face to catch the roof run-off.
+  // Freestanding: the eave purlin is skipped here — the column's plumb fascia (above) is
+  // the eave member.
   const pW = dP.b, pH = dP.d;
-  const eaveFascia = (x: number, outDir: number) => {
-    const yT = rafterTopY(x);                 // rafter top at the eave
-    const fH = Math.max(pH, 150);             // fascia height
-    const xb = x + outDir * pW;               // outboard face
-    sec += `<rect x="${r1(Math.min(x, xb))}" y="${r1(yT)}" width="${r1(pW)}" height="${r1(fH)}" fill="rgba(33,150,243,0.18)" stroke="#2196f3" stroke-width="4"/>`;
-    // gutter on the outboard face near the bottom (U-profile with a hook)
-    const gW = 110, gBack = xb, gFront = xb + outDir * gW, gTop = yT + fH - 95, gBot = yT + fH + 15;
-    sec += `<path d="M ${r1(gBack)} ${r1(gTop)} L ${r1(gBack)} ${r1(gBot)} L ${r1(gFront)} ${r1(gBot)} L ${r1(gFront)} ${r1(gTop - 18)}" fill="none" stroke="#c8cce0" stroke-width="4"/>`;
-    xs.push(Math.min(x, xb), gFront); ys.push(yT, gBot);
-  };
   for (const x of purlinXs) {
     const isEave = Math.abs(x - offset) < 1 || Math.abs(x - (S - offset)) < 1;
-    if (isEave && !p.wall) {                  // freestanding eave → plumb fascia + gutter
-      eaveFascia(x, x <= half ? -1 : 1);
-      continue;
-    }
+    if (isEave && steelCol) continue;         // eave handled by the column fascia
     const ty = rafterTopY(x);
     const ang = x <= half ? -p.pitchDeg : p.pitchDeg; // left slope rises right; right slope mirror
     sec += `<g transform="rotate(${r1(ang)} ${r1(x)} ${r1(ty)})"><rect x="${r1(x - pW / 2)}" y="${r1(ty)}" width="${r1(pW)}" height="${r1(pH)}" fill="${COL.purlin.fill}" stroke="${COL.purlin.stroke}" stroke-width="3" stroke-dasharray="22 16"/></g>`;
