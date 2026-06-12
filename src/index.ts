@@ -114,6 +114,13 @@ export {
   defaultFrames,
   bumpVariant,
 } from './frames.js';
+export {
+  CONNECTION_CATALOG,
+  KIND_LABELS,
+  KIND_GENERATORS,
+  connectionOptionsForSide,
+  searchConnections,
+} from './connectionCatalog.js';
 
 // ── Plan + roof geometry ──
 export {
