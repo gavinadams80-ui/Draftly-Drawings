@@ -15,12 +15,16 @@ import { parseSectionDims } from './drawings.js';
 
 export interface GableFrameModelParams {
   spanMm: number;          // clear span, column centreline to column centreline
+  depthMm: number;         // building depth (front → back) — the plan's other axis
   pitchDeg: number;
   eaveHeightMm: number;    // column height (ground → eave bearing)
+  nFrames: number;         // number of portal frames along the depth
+  purlinSpacingMm: number; // purlin spacing across the span (from engineering)
   rafter: Section;         // portal rafter
   column: Section;         // portal column
   chord: Section;          // gable bottom-chord tie
   dropper: Section;        // gable infill dropper
+  purlin?: Section;        // purlin (for the roof-plan line width)
   nBays?: number;          // infill bays across the span (interior droppers = nBays − 1)
   plateOnRafter?: boolean; // close the C open face with a plate
   plateOnColumn?: boolean;
@@ -114,25 +118,42 @@ export function generateGableFrameModelSVG(p: GableFrameModelParams): string {
   // Ground line
   sec += `<line x1="${r1(-dC.d)}" y1="${r1(baseY)}" x2="${r1(S + dC.d)}" y2="${r1(baseY)}" stroke="#666" stroke-width="4"/>`;
 
-  // ── PLAN (top view) — roof seen from above, on the same span axis, above the section ──
-  // Single-frame top view: the two rafter top-flanges (width = rafter.b) split at the ridge.
-  const planGap = Math.max(700, H * 0.5);
-  const planBandH = dR.b;
-  const planTop = apexY - planGap - planBandH; // above the section apex
+  // ── PLAN (roof, top view) — span × building depth, above the section, same span axis ──
+  // The whole roof from above at 1:1: each portal frame is a rafter band running across
+  // the span; purlins run along the depth at their span spacing; ridge + eaves down the
+  // centre/edges. Span (x) is shared with the section, so eaves/ridge/purlins project.
+  const D = p.depthMm;
+  const nF = Math.max(2, p.nFrames);
+  const dP = p.purlin ? parseSectionDims(p.purlin) : dD;
+  const planGap = Math.max(800, H * 0.35);
+  const planBot = apexY - planGap;       // plan sits above the section apex
+  const planTop = planBot - D;
   let plan = '';
-  plan += `<rect x="0" y="${r1(planTop)}" width="${r1(half)}" height="${r1(planBandH)}" fill="${COL.rafter.fill}" stroke="${COL.rafter.stroke}" stroke-width="3"/>`;
-  plan += `<rect x="${r1(half)}" y="${r1(planTop)}" width="${r1(half)}" height="${r1(planBandH)}" fill="${COL.rafter.fill}" stroke="${COL.rafter.stroke}" stroke-width="3"/>`;
-  // purlin/dropper grid lines across the roof plan (project to the section droppers)
-  for (const x of dropXs) {
-    plan += `<line x1="${r1(x)}" y1="${r1(planTop)}" x2="${r1(x)}" y2="${r1(planTop + planBandH)}" stroke="${COL.dropper.stroke}" stroke-width="2" opacity="0.7"/>`;
+  // roof extent
+  plan += `<rect x="0" y="${r1(planTop)}" width="${r1(S)}" height="${r1(D)}" fill="rgba(120,130,160,0.05)" stroke="#6b7090" stroke-width="2"/>`;
+  // purlin lines (along the depth) at span positions, from the ridge outward + eave
+  const purlinXs: number[] = [half];
+  for (let x = half - p.purlinSpacingMm; x > 30; x -= p.purlinSpacingMm) { purlinXs.push(x); purlinXs.push(S - x); }
+  purlinXs.push(0, S);
+  for (const x of purlinXs) {
+    plan += `<rect x="${r1(x - dP.b / 2)}" y="${r1(planTop)}" width="${r1(dP.b)}" height="${r1(D)}" fill="${COL.dropper.fill}" stroke="${COL.dropper.stroke}" stroke-width="1.5" opacity="0.75"/>`;
   }
-  xs.push(0, S); ys.push(planTop, planTop + planBandH);
+  // portal frames (rafter bands) across the span at each depth station
+  for (let i = 0; i < nF; i++) {
+    const y = planTop + (i / (nF - 1)) * D;
+    plan += `<rect x="0" y="${r1(y - dR.b / 2)}" width="${r1(S)}" height="${r1(dR.b)}" fill="${COL.rafter.fill}" stroke="${COL.rafter.stroke}" stroke-width="3"/>`;
+  }
+  // ridge + eaves down the plan
+  for (const [x, w] of [[0, 3], [half, 4], [S, 3]] as [number, number][]) {
+    plan += `<line x1="${r1(x)}" y1="${r1(planTop)}" x2="${r1(x)}" y2="${r1(planBot)}" stroke="${x === half ? '#e8c060' : '#9aa0bb'}" stroke-width="${w}"/>`;
+  }
+  xs.push(0, S); ys.push(planTop, planBot);
 
-  // ── Projection guides: eaves, ridge, droppers — plan → section ──
+  // ── Projection guides: eaves, ridge, purlins — plan → section ──
   let guides = '';
-  const guideXs = [0, half, S, ...dropXs];
+  const guideXs = [0, half, S, ...purlinXs];
   for (const gx of guideXs) {
-    guides += `<line x1="${r1(gx)}" y1="${r1(planTop)}" x2="${r1(gx)}" y2="${r1(baseY)}" stroke="${COL.guide}" stroke-width="1.5" stroke-dasharray="6 10" opacity="0.5"/>`;
+    guides += `<line x1="${r1(gx)}" y1="${r1(planTop)}" x2="${r1(gx)}" y2="${r1(baseY)}" stroke="${COL.guide}" stroke-width="1.5" stroke-dasharray="6 10" opacity="0.45"/>`;
   }
 
   // ── Member call-outs ──
@@ -140,7 +161,7 @@ export function generateGableFrameModelSVG(p: GableFrameModelParams): string {
     `<text x="${r1(x)}" y="${r1(y)}" font-family="${FONT}" font-size="${r1(Math.max(120, S * 0.018))}" fill="${COL.text}" text-anchor="${anchor}">${s}</text>`;
   const fs = Math.max(120, S * 0.018);
   let labels = '';
-  labels += label(half, planTop - fs * 0.6, `PLAN (top) · RAFTER ${p.rafter.size}`, 'middle');
+  labels += label(half, planTop - fs * 0.6, `ROOF PLAN (1:1) · ${nF} frames · purlins ${p.purlin?.size ?? ''}`, 'middle');
   labels += label(half * 0.5, apexY + (eaveY - apexY) * 0.5 - fs, `RAFTER ${p.rafter.size}${p.plateOnRafter ? ' + PLATE' : ''}`, 'middle');
   labels += label(half, eaveY + dCh.d + fs * 1.4, `BOTTOM CHORD ${p.chord.size}`, 'middle');
   if (dropXs.length) labels += label(dropXs[Math.floor(dropXs.length / 2)] + dD.b, eaveY - rise * 0.35, `DROPPER ${p.dropper.size}`, 'start');
