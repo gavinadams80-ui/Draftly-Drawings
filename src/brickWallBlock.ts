@@ -22,6 +22,7 @@ export interface BrickWallBlockOpts {
   fasciaBottomMm?: number;  // mm above FFL — bottom of fascia (Intelligence `fasciaHeight`)
   fasciaTopMm?: number;     // mm above FFL — top of fascia / eave (Intelligence `gutterHeight`)
   mirror?: boolean;         // false = wall on the LEFT (span to its right); true = right wall
+  gutterWidthMm?: number;   // gutter width (Intelligence) — extends/decreases the gutter
   showGutter?: boolean;     // default true
   showLabels?: boolean;     // member call-outs (default true)
 }
@@ -83,7 +84,7 @@ export function generateBrickWallBlock(o: BrickWallBlockOpts): string {
   if (o.showGutter !== false) {
     const fasciaH = o.fasciaTopMm != null && o.fasciaBottomMm != null ? Math.max(1, o.fasciaTopMm - o.fasciaBottomMm) : 200;
     const v = fasciaH / 200;
-    const gutW = 115, gutLegL = 62 * v, gutLegR = 90 * v, gutGap = 110 * v, gutHook = 8, gutHookUp = 6;
+    const gutW = o.gutterWidthMm ?? 115, gutLegL = 62 * v, gutLegR = 90 * v, gutGap = 110 * v, gutHook = 8, gutHookUp = 6;
     const gutBotY = fBotY - gutGap;
     const gInnX = inner + sp * 30;
     const gOutX = gInnX + sp * gutW;

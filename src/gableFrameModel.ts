@@ -32,6 +32,9 @@ export interface GableFrameModelParams {
   dropper?: Section;       // gable infill dropper (gable-end only)
   purlin?: Section;        // purlin (for the roof-plan line width)
   nBays?: number;          // infill bays across the span (interior droppers = nBays − 1)
+  dropperSpacingMm?: number; // infill dropper spacing (centred on the apex, symmetric)
+  rafterOffsetMm?: number; // rafter set-back from the wall/fascia to clear the gutter
+  gutterWidthMm?: number;  // gutter width (Intelligence) — passed through to the wall block
   plateOnRafter?: boolean; // close the C open face with a plate
   plateOnColumn?: boolean;
   // When the structure attaches to an existing brick-veneer dwelling, draw that wall
@@ -83,66 +86,93 @@ export function generateGableFrameModelSVG(p: GableFrameModelParams): string {
   const dC = parseSectionDims(p.column);
   const dCh = parseSectionDims(p.chord ?? p.rafter);
   const dD = parseSectionDims(p.dropper ?? p.rafter);
-  const nBays = Math.max(2, p.nBays ?? Math.max(2, Math.round(p.spanMm / 1000)));
-
   const S = p.spanMm;
   const half = S / 2;
   const pitch = (p.pitchDeg * Math.PI) / 180;
-  const rise = half * Math.tan(pitch);
+  const tan = Math.tan(pitch);
   const H = p.eaveHeightMm;
-  const rafLen = Math.hypot(half, rise);
   const fs = Math.max(120, S * 0.018); // call-out font size (mm)
 
-  // ── SECTION (side) — apex at y=0, eave at y=rise, base at y=rise+H ──
-  const apexY = 0, eaveY = rise, baseY = rise + H;
+  // Rafter set-back from the wall/fascia to clear the gutter (gable-end only). The rafter
+  // begins here and must not run past it toward the wall; the bottom chord runs the full
+  // span to the fascia underneath it.
+  const offset = isGableEnd ? Math.max(0, p.rafterOffsetMm ?? 0) : 0;
+  const run = Math.max(1, half - offset);
+  const rafterRise = run * tan;
+  const vThick = dR.d / Math.cos(pitch);   // plumb-cut (vertical) thickness of the rafter
+
+  // ── SECTION vertical datum: apex PEAK at y=0, working downward ──
+  const ridgeTopY = 0;                     // top face at the ridge (apex peak)
+  const ridgeUnderY = ridgeTopY + vThick;  // rafter underside at the ridge
+  const bearY = ridgeUnderY + rafterRise;  // eave bearing = chord top = rafter underside at eave
+  const baseY = bearY + H;                  // FFL / ground
+  const apexY = ridgeTopY;                  // aliases for the plan placement below
+  const eaveY = bearY;
+
   const xs: number[] = [], ys: number[] = [];
   const track = (m: { xs: number[]; ys: number[] }) => { xs.push(...m.xs); ys.push(...m.ys); };
+  ys.push(ridgeTopY, bearY, baseY);
   let sec = '';
 
-  // Sides: existing brick-veneer walls (clear span = gap between inner faces) and/or
-  // steel columns. Gable-end trusses bear on the walls (no steel column); the portal
-  // keeps its moment-frame columns standing against the wall line.
+  // Sides: existing brick-veneer walls and/or steel columns. Gable-end trusses bear on
+  // the walls; the portal keeps its moment-frame columns standing against the wall line.
   if (p.wall) {
-    const common = { fflY: baseY, eaveHeightMm: p.wall.eaveHeightMm, fasciaBottomMm: p.wall.fasciaBottomMm, fasciaTopMm: p.wall.fasciaTopMm };
+    const common = { fflY: baseY, eaveHeightMm: p.wall.eaveHeightMm, fasciaBottomMm: p.wall.fasciaBottomMm, fasciaTopMm: p.wall.fasciaTopMm, gutterWidthMm: p.gutterWidthMm };
     sec += generateBrickWallBlock({ ...common, innerFaceX: 0, mirror: false });
     sec += generateBrickWallBlock({ ...common, innerFaceX: S, mirror: true });
     xs.push(-BRICK_WALL_THICKNESS_MM, S + BRICK_WALL_THICKNESS_MM);
     ys.push(baseY + 100);
   }
   if (!p.wall || !isGableEnd) {
-    // Steel columns (centreline at x=0 and x=S; depth = column section depth, straddling)
     for (const cx of [0, S]) {
-      const m = memberBand(cx - dC.d / 2, baseY, cx - dC.d / 2, eaveY, dC.d, COL.column, dC.t, !!p.plateOnColumn);
-      sec += m.svg; track(m);
+      sec += `<rect x="${r1(cx - dC.d / 2)}" y="${r1(bearY)}" width="${r1(dC.d)}" height="${r1(baseY - bearY)}" fill="${COL.column.fill}" stroke="${COL.column.stroke}" stroke-width="3"/>`;
+      if (p.plateOnColumn) {
+        const px = cx > 0 ? cx - dC.d / 2 : cx + dC.d / 2;
+        sec += `<line x1="${r1(px)}" y1="${r1(bearY)}" x2="${r1(px)}" y2="${r1(baseY)}" stroke="${COL.plate}" stroke-width="5"/>`;
+      }
+      xs.push(cx - dC.d / 2, cx + dC.d / 2); ys.push(bearY, baseY);
     }
   }
-  // Bottom-chord tie at eave level (gable-end tied truss only — the portal is untied)
+  // Bottom-chord tie — runs the full clear span to the fascia (gable-end only); top at the
+  // bearing line so the rafter underside sits on it.
   if (isGableEnd) {
-    const m = memberBand(0, eaveY, S, eaveY, dCh.d, COL.chord, dCh.t, false);
+    const m = memberBand(0, bearY, S, bearY, dCh.d, COL.chord, dCh.t, false);
     sec += m.svg; track(m);
   }
-  // Rafters: eave → ridge, depth hangs below the top face
-  {
-    const l = memberBand(0, eaveY, half, apexY, dR.d, COL.rafter, dR.t, !!p.plateOnRafter);
-    const rr = memberBand(S, eaveY, half, apexY, dR.d, COL.rafter, dR.t, !!p.plateOnRafter);
-    sec += l.svg + rr.svg; track(l); track(rr);
-  }
-  // Infill droppers (gable-end only): interior bay lines, chord top → rafter underside
+  // Rafter underside height at span position x (used by the droppers).
+  const rafterUnderY = (x: number) => {
+    const dist = x <= half ? (x - offset) : ((S - offset) - x);
+    return bearY - Math.max(0, dist) * tan;
+  };
+  // Rafters — parallelogram with plumb (vertical) cuts at the eave (offset) and ridge so
+  // the two butt cleanly at the apex (no overlap). Underside bears on the chord top.
+  const rafterQuad = (eaveX: number) => {
+    const pts: [number, number][] = [[eaveX, bearY], [half, ridgeUnderY], [half, ridgeTopY], [eaveX, bearY - vThick]];
+    let s = `<polygon points="${pts.map(([x, y]) => `${r1(x)},${r1(y)}`).join(' ')}" fill="${COL.rafter.fill}" stroke="${COL.rafter.stroke}" stroke-width="3"/>`;
+    s += `<line x1="${r1(eaveX)}" y1="${r1(bearY - vThick)}" x2="${r1(half)}" y2="${r1(ridgeTopY)}" stroke="${COL.rafter.stroke}" stroke-width="1.6" opacity="0.5"/>`;
+    if (p.plateOnRafter) s += `<line x1="${r1(eaveX)}" y1="${r1(bearY)}" x2="${r1(half)}" y2="${r1(ridgeUnderY)}" stroke="${COL.plate}" stroke-width="5"/>`;
+    xs.push(eaveX, half); ys.push(ridgeTopY, bearY);
+    return s;
+  };
+  sec += rafterQuad(offset) + rafterQuad(S - offset);
+
+  // Infill droppers (gable-end) — drawn with the 100mm face toward the viewer (side view),
+  // centred on the apex and symmetric to both sides; chord top → rafter underside.
   const dropXs: number[] = [];
-  if (isGableEnd) {
-    for (let i = 1; i < nBays; i++) {
-      const x = (S * i) / nBays;
+  if (isGableEnd && p.dropper) {
+    const sp = Math.max(150, p.dropperSpacingMm ?? 900);
+    for (let x = half; x > offset + 1; x -= sp) {
       dropXs.push(x);
-      // rafter underside y at this x (top face minus rafter depth along vertical ≈ dR.d/cos)
-      const onLeft = x <= half;
-      const topY = onLeft ? eaveY - (eaveY - apexY) * (x / half) : apexY + (eaveY - apexY) * ((x - half) / half);
-      const underY = topY + dR.d / Math.cos(pitch);
-      const m = memberBand(x - dD.b / 2, eaveY, x - dD.b / 2, underY, dD.b, COL.dropper, dD.t, false);
-      sec += m.svg; track(m);
+      if (Math.abs(x - half) > 1) dropXs.push(S - x);
+    }
+    for (const x of dropXs) {
+      const underY = rafterUnderY(x);
+      sec += `<rect x="${r1(x - dD.d / 2)}" y="${r1(underY)}" width="${r1(dD.d)}" height="${r1(bearY - underY)}" fill="${COL.dropper.fill}" stroke="${COL.dropper.stroke}" stroke-width="3"/>`;
+      xs.push(x - dD.d / 2, x + dD.d / 2); ys.push(underY, bearY);
     }
   }
   // Ground line
-  sec += `<line x1="${r1(-dC.d)}" y1="${r1(baseY)}" x2="${r1(S + dC.d)}" y2="${r1(baseY)}" stroke="#666" stroke-width="4"/>`;
+  sec += `<line x1="${r1(-BRICK_WALL_THICKNESS_MM - 100)}" y1="${r1(baseY)}" x2="${r1(S + BRICK_WALL_THICKNESS_MM + 100)}" y2="${r1(baseY)}" stroke="#666" stroke-width="4"/>`;
 
   // ── PLAN (roof, top view) — span × building depth, above the section, same span axis ──
   // The whole roof from above at 1:1: each portal frame is a rafter band running across
@@ -157,10 +187,11 @@ export function generateGableFrameModelSVG(p: GableFrameModelParams): string {
   let plan = '';
   // roof extent
   plan += `<rect x="0" y="${r1(planTop)}" width="${r1(S)}" height="${r1(D)}" fill="rgba(120,130,160,0.05)" stroke="#6b7090" stroke-width="2"/>`;
-  // purlin lines (along the depth) at span positions, from the ridge outward + eave
-  const purlinXs: number[] = [half];
-  for (let x = half - p.purlinSpacingMm; x > 30; x -= p.purlinSpacingMm) { purlinXs.push(x); purlinXs.push(S - x); }
-  purlinXs.push(0, S);
+  // purlin lines (along the depth): one 50mm from the apex, marching to the eave, with the
+  // eave-end purlin flush with the rafter end face (at the rafter offset).
+  const purlinXs: number[] = [];
+  for (let x = half - 50; x > offset + 1; x -= p.purlinSpacingMm) { purlinXs.push(x); purlinXs.push(S - x); }
+  purlinXs.push(offset, S - offset);
   for (const x of purlinXs) {
     plan += `<rect x="${r1(x - dP.b / 2)}" y="${r1(planTop)}" width="${r1(dP.b)}" height="${r1(D)}" fill="${COL.dropper.fill}" stroke="${COL.dropper.stroke}" stroke-width="1.5" opacity="0.75"/>`;
   }
@@ -199,11 +230,11 @@ export function generateGableFrameModelSVG(p: GableFrameModelParams): string {
   const frameKind = isGableEnd ? 'GABLE END · INFILL' : 'PORTAL FRAME';
   let labels = '';
   labels += label(half, planTop - fs * 0.6, `ROOF PLAN (1:1) · ${nF} frames · purlins ${p.purlin?.size ?? ''}`, 'middle');
-  labels += label(half * 0.5, apexY + (eaveY - apexY) * 0.5 - fs, `RAFTER ${p.rafter.size}${p.plateOnRafter ? ' + PLATE' : ''}`, 'middle');
-  if (isGableEnd && p.chord) labels += label(half, eaveY + dCh.d + fs * 1.4, `BOTTOM CHORD ${p.chord.size}`, 'middle');
-  if (isGableEnd && p.dropper && dropXs.length) labels += label(dropXs[Math.floor(dropXs.length / 2)] + dD.b, eaveY - rise * 0.35, `DROPPER ${p.dropper.size}`, 'start');
+  labels += label((offset + half) / 2, (ridgeTopY + bearY) * 0.5 - fs, `RAFTER ${p.rafter.size}${p.plateOnRafter ? ' + PLATE' : ''}`, 'middle');
+  if (isGableEnd && p.chord) labels += label(half, bearY + dCh.d + fs * 1.4, `BOTTOM CHORD ${p.chord.size}`, 'middle');
+  if (isGableEnd && p.dropper && dropXs.length) labels += label(half + dD.d, bearY - (bearY - ridgeUnderY) * 0.45, `DROPPER ${p.dropper.size}`, 'start');
   // Column call-out (steel columns only — brick walls label themselves)
-  if (!p.wall) labels += label(dC.d / 2 + fs * 0.5, (eaveY + baseY) / 2, `COLUMN ${p.column.size}${p.plateOnColumn ? ' + PLATE' : ''}`, 'start');
+  if (!p.wall) labels += label(dC.d / 2 + fs * 0.5, (bearY + baseY) / 2, `COLUMN ${p.column.size}${p.plateOnColumn ? ' + PLATE' : ''}`, 'start');
   labels += label(half, baseY + fs * 1.6, `SECTION ${lab} · ${frameKind} · ${(S / 1000).toFixed(2)} m SPAN · 1:1`, 'middle');
 
   // ── viewBox from bounds ──
