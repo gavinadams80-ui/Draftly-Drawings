@@ -34,6 +34,7 @@ export interface GableFrameModelParams {
   nBays?: number;          // infill bays across the span (interior droppers = nBays − 1)
   dropperSpacingMm?: number; // infill dropper spacing (centred on the apex, symmetric)
   ridgePurlinGapMm?: number;  // gap from the apex to the first (ridge) purlin (default 75)
+  chordEndInsetMm?: number;   // bottom-chord end set-back from the wall to clear the fascia (default 40)
   rafterOffsetMm?: number; // rafter set-back from the wall/fascia to clear the gutter
   gutterWidthMm?: number;  // gutter width (Intelligence) — passed through to the wall block
   plateOnRafter?: boolean; // close the C open face with a plate
@@ -136,10 +137,12 @@ export function generateGableFrameModelSVG(p: GableFrameModelParams): string {
       xs.push(cx - dC.d / 2, cx + dC.d / 2); ys.push(bearY, baseY);
     }
   }
-  // Bottom-chord tie — runs the full clear span to the fascia (gable-end only); top at the
-  // bearing line so the rafter underside sits on it.
+  // Bottom-chord tie (gable-end only) — top at the bearing line so the rafter underside
+  // sits on it. Set back from each wall to clear the fascia (20mm clearance ⇒ ~40mm from
+  // the wall face), so it can't clash with the fascia.
+  const chordInset = p.chordEndInsetMm ?? 40;
   if (isGableEnd) {
-    const m = memberBand(0, bearY, S, bearY, dCh.d, COL.chord, dCh.t, false);
+    const m = memberBand(chordInset, bearY, S - chordInset, bearY, dCh.d, COL.chord, dCh.t, false);
     sec += m.svg; track(m);
   }
   // Rafter underside height at span position x (used by the droppers).
@@ -186,9 +189,13 @@ export function generateGableFrameModelSVG(p: GableFrameModelParams): string {
   const cosP = Math.cos(pitch);
   const slopeLen = run / cosP;
   const ridgeGap = p.ridgePurlinGapMm ?? 75;
+  // Even spacing from the ridge purlin to the eave, with the engineering internal span as
+  // the MAX — the remainder is spread equally over the bays (so every bay ≤ max spacing).
+  const distToEave = Math.max(1, slopeLen - ridgeGap);
+  const nBays = Math.max(1, Math.ceil(distToEave / p.purlinSpacingMm));
+  const purlinSpace = distToEave / nBays;
   const slopeDs: number[] = [];
-  for (let s = ridgeGap; s < slopeLen - 50; s += p.purlinSpacingMm) slopeDs.push(s);
-  slopeDs.push(slopeLen);                                   // eave purlin at the rafter end
+  for (let i = 0; i <= nBays; i++) slopeDs.push(ridgeGap + i * purlinSpace); // ridge → eave (rafter end)
   const purlinXs: number[] = [];
   for (const s of slopeDs) { purlinXs.push(half - s * cosP); purlinXs.push(half + s * cosP); }
 
@@ -197,13 +204,13 @@ export function generateGableFrameModelSVG(p: GableFrameModelParams): string {
     const dist = x <= half ? (half - x) : (x - half);
     return ridgeTopY + (Math.min(dist, run) / run) * (bearY - vThick - ridgeTopY);
   };
-  // Section end-view of each purlin — a dotted rectangle (purlin section) sitting on the
-  // rafter top, spaced along the rafter. (Drawn sitting ON the rafter top face.)
+  // Section end-view of each purlin — a dotted rectangle (purlin section) with its TOP
+  // aligned to the rafter top face, spaced along the rafter.
   const pW = dP.b, pH = dP.d;
   for (const x of purlinXs) {
     const ty = rafterTopY(x);
-    sec += `<rect x="${r1(x - pW / 2)}" y="${r1(ty - pH)}" width="${r1(pW)}" height="${r1(pH)}" fill="${COL.purlin.fill}" stroke="${COL.purlin.stroke}" stroke-width="3" stroke-dasharray="22 16"/>`;
-    ys.push(ty - pH);
+    sec += `<rect x="${r1(x - pW / 2)}" y="${r1(ty)}" width="${r1(pW)}" height="${r1(pH)}" fill="${COL.purlin.fill}" stroke="${COL.purlin.stroke}" stroke-width="3" stroke-dasharray="22 16"/>`;
+    ys.push(ty, ty + pH);
   }
 
   // Ground line
