@@ -67,7 +67,12 @@ export function generateWallSectionSVG(
   const sc = opts.scale ?? 0.12;          // px per mm (1 ⇒ real-mm 1:1)
   const annotate = opts.annotate ?? true; // false ⇒ clean geometry only
   const PXBASE = sc / 0.12;               // pixel-space constants track the chosen scale
-  const W = 1060 * PXBASE, H = 600 * PXBASE;
+  const H = 600 * PXBASE;
+  // Canvas width auto-fits the span so wide clear-spans (up to ~15 m) don't clip. The
+  // legacy 1060-unit width only fits ~6 m; beyond that, grow to the right wall face plus
+  // a margin for the height-dimension stack. The `95 + (460 + spanMm)·sc` term mirrors the
+  // X layout below: mL (95) + wall build-up (90+30+110 left, 110+30+90 right = 460 mm) + span.
+  const W = Math.max(1060 * PXBASE, (95 + (460 + spanMm) * sc) + 190 * PXBASE);
 
 
   const brickFill   = 'rgba(190,105,50,0.45)';
@@ -142,8 +147,18 @@ export function generateWallSectionSVG(
   const vbX          = -leftExtra;
   const vbW          = W + leftExtra;
 
-  let svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="${r(vbX)} 0 ${r(vbW)} ${H}" style="width:100%;max-width:${r(vbW)}px;display:block;">`;
-  svg += `<rect x="${r(vbX)}" width="${r(vbW)}" height="${H}" fill="transparent"/>`;
+  // Vertical fit: a wider span / steeper pitch raises the ridge apex above y=0, so extend
+  // the viewBox upward to keep it in frame. Estimate the ridge-top from the inputs (gable
+  // rises over the half-span, skillion over the full span); the real geometry is drawn from
+  // the column/rafter maths further down — this only sizes the viewing window.
+  const estPitchRad = (pitchDeg * Math.PI) / 180;
+  const estRise = (isGable ? (spanMm * sc) / 2 : spanMm * sc) * Math.tan(estPitchRad);
+  const estApexY = timberTopY - estRise - rafterD * sc;
+  const vbY = Math.min(0, estApexY - 24); // 24px headroom above the apex
+  const vbH = H - vbY;
+
+  let svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="${r(vbX)} ${r(vbY)} ${r(vbW)} ${r(vbH)}" style="width:100%;max-width:${r(vbW)}px;display:block;">`;
+  svg += `<rect x="${r(vbX)}" y="${r(vbY)}" width="${r(vbW)}" height="${r(vbH)}" fill="transparent"/>`;
   // title deferred
 
   // ── CONCRETE SLAB ──
