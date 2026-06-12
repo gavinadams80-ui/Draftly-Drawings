@@ -12,6 +12,7 @@
 
 import type { Section } from './types.js';
 import { parseSectionDims } from './drawings.js';
+import { generateBrickWallBlock, BRICK_WALL_THICKNESS_MM } from './brickWallBlock.js';
 
 export interface GableFrameModelParams {
   spanMm: number;          // clear span, column centreline to column centreline
@@ -33,6 +34,10 @@ export interface GableFrameModelParams {
   nBays?: number;          // infill bays across the span (interior droppers = nBays − 1)
   plateOnRafter?: boolean; // close the C open face with a plate
   plateOnColumn?: boolean;
+  // When the structure attaches to an existing brick-veneer dwelling, draw that wall
+  // detail on both sides instead of steel columns. The clear span (spanMm) is the gap
+  // between the inner brick faces. Fascia/gutter heights come from Site Intelligence.
+  wall?: { eaveHeightMm: number; fasciaBottomMm?: number; fasciaTopMm?: number };
 }
 
 const FONT = 'DM Mono,monospace';
@@ -94,10 +99,22 @@ export function generateGableFrameModelSVG(p: GableFrameModelParams): string {
   const track = (m: { xs: number[]; ys: number[] }) => { xs.push(...m.xs); ys.push(...m.ys); };
   let sec = '';
 
-  // Columns (centreline at x=0 and x=S; depth = column section depth, straddling)
-  for (const cx of [0, S]) {
-    const m = memberBand(cx - dC.d / 2, baseY, cx - dC.d / 2, eaveY, dC.d, COL.column, dC.t, !!p.plateOnColumn);
-    sec += m.svg; track(m);
+  // Sides: existing brick-veneer walls (clear span = gap between inner faces) and/or
+  // steel columns. Gable-end trusses bear on the walls (no steel column); the portal
+  // keeps its moment-frame columns standing against the wall line.
+  if (p.wall) {
+    const common = { fflY: baseY, eaveHeightMm: p.wall.eaveHeightMm, fasciaBottomMm: p.wall.fasciaBottomMm, fasciaTopMm: p.wall.fasciaTopMm };
+    sec += generateBrickWallBlock({ ...common, innerFaceX: 0, mirror: false });
+    sec += generateBrickWallBlock({ ...common, innerFaceX: S, mirror: true });
+    xs.push(-BRICK_WALL_THICKNESS_MM, S + BRICK_WALL_THICKNESS_MM);
+    ys.push(baseY + 100);
+  }
+  if (!p.wall || !isGableEnd) {
+    // Steel columns (centreline at x=0 and x=S; depth = column section depth, straddling)
+    for (const cx of [0, S]) {
+      const m = memberBand(cx - dC.d / 2, baseY, cx - dC.d / 2, eaveY, dC.d, COL.column, dC.t, !!p.plateOnColumn);
+      sec += m.svg; track(m);
+    }
   }
   // Bottom-chord tie at eave level (gable-end tied truss only — the portal is untied)
   if (isGableEnd) {
@@ -185,8 +202,8 @@ export function generateGableFrameModelSVG(p: GableFrameModelParams): string {
   labels += label(half * 0.5, apexY + (eaveY - apexY) * 0.5 - fs, `RAFTER ${p.rafter.size}${p.plateOnRafter ? ' + PLATE' : ''}`, 'middle');
   if (isGableEnd && p.chord) labels += label(half, eaveY + dCh.d + fs * 1.4, `BOTTOM CHORD ${p.chord.size}`, 'middle');
   if (isGableEnd && p.dropper && dropXs.length) labels += label(dropXs[Math.floor(dropXs.length / 2)] + dD.b, eaveY - rise * 0.35, `DROPPER ${p.dropper.size}`, 'start');
-  // Column call-out kept inside the frame (just right of the left column)
-  labels += label(dC.d / 2 + fs * 0.5, (eaveY + baseY) / 2, `COLUMN ${p.column.size}${p.plateOnColumn ? ' + PLATE' : ''}`, 'start');
+  // Column call-out (steel columns only — brick walls label themselves)
+  if (!p.wall) labels += label(dC.d / 2 + fs * 0.5, (eaveY + baseY) / 2, `COLUMN ${p.column.size}${p.plateOnColumn ? ' + PLATE' : ''}`, 'start');
   labels += label(half, baseY + fs * 1.6, `SECTION ${lab} · ${frameKind} · ${(S / 1000).toFixed(2)} m SPAN · 1:1`, 'middle');
 
   // ── viewBox from bounds ──

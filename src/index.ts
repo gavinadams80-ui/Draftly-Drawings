@@ -132,6 +132,8 @@ export { generateMemberProfile } from './memberProfile.js';
 export type { MemberView, MemberProfileOptions } from './memberProfile.js';
 export { generateGableFrameModelSVG } from './gableFrameModel.js';
 export type { GableFrameModelParams } from './gableFrameModel.js';
+export { generateBrickWallBlock, BRICK_WALL_THICKNESS_MM } from './brickWallBlock.js';
+export type { BrickWallBlockOpts } from './brickWallBlock.js';
 
 // ── Shared terminology key (one vocabulary across Intelligence / Engineering / Drafting) ──
 export {
