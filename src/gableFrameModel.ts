@@ -162,6 +162,20 @@ export function generateGableFrameModelSVG(p: GableFrameModelParams): string {
   };
   sec += rafterQuad(offset) + rafterQuad(S - offset);
 
+  // Red RHS standoff — the through-fascia wall attachment from the prior wall-section
+  // detail: a 75mm steel member running from the timber wall, through the cavity / brick /
+  // fascia, into the rafter eave end. Sits at the bearing line; drawn on both walls.
+  if (p.wall) {
+    const rhsTop = bearY - 75, rhsH2 = 75, timberIn = 90; // 90mm in from the outer timber face
+    const standoff = (x0: number, x1: number) => {
+      const x = Math.min(x0, x1), w = Math.abs(x1 - x0);
+      sec += `<rect x="${r1(x)}" y="${r1(rhsTop)}" width="${r1(w)}" height="${r1(rhsH2)}" fill="rgba(244,67,54,0.18)" stroke="#f44336" stroke-width="4"/>`;
+      xs.push(x0, x1); ys.push(rhsTop, rhsTop + rhsH2);
+    };
+    standoff(-BRICK_WALL_THICKNESS_MM + timberIn, offset + 30);       // left: timber → rafter eave
+    standoff(S + BRICK_WALL_THICKNESS_MM - timberIn, S - offset - 30); // right: mirror
+  }
+
   // Infill droppers (gable-end) — drawn with the 100mm face toward the viewer (side view),
   // centred on the apex and symmetric to both sides; chord top → rafter underside.
   const dropXs: number[] = [];
